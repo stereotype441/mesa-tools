@@ -298,6 +298,32 @@ class SimpleOutputFactory(object):
 class InsnPrinter(PrinterBase):
     def __init__(self, output_factory, history = None):
         PrinterBase.__init__(self, output_factory, history)
+
+        self.op_type_table = { 'unop': 1, 'binop': 2, 'quadop': 4 }
+        self.op_table = {
+            'bit_not': "~",
+            'logic_not': "!",
+            'add': "+",
+            'sub': "-",
+            'mul': "*",
+            'div': "/",
+            'mod': "%",
+            'less': "<",
+            'greater': ">",
+            'lequal': "<=",
+            'gequal': ">=",
+            'equal': "==",
+            'nequal': "!=",
+            'lshift': "<<",
+            'rshift': ">>",
+            'bit_and': "&",
+            'bit_xor': "^",
+            'bit_or': "|",
+            'logic_and': "&&",
+            'logic_xor': "^^",
+            'logic_or': "||",
+            }
+
         self.insn_downcast = InsnDowncaster()
         print_insn = lambda v: self.dispatch(self.insn_downcast(v))
         self.register('ir_instruction', print_insn)
@@ -347,7 +373,11 @@ class InsnPrinter(PrinterBase):
                     'signatures',
                     self.iterate('ir_function_signature', self.dispatch,
                                  self.newline))))
-        # TODO: ir_expression
+        self.register('ir_expression', self.sexp(
+                self.label,
+                self.literal('expression'),
+                self.field('type'),
+                self.print_expr_operator_and_operands))
         # TODO: ir_texture
         # TODO: ir_swizzle
         self.register('ir_dereference_variable', self.sexp(
@@ -370,6 +400,18 @@ class InsnPrinter(PrinterBase):
         # TODO: ir_if
         # TODO: ir_loop
         # TODO: ir_loop_jump
+
+    def print_expr_operator_and_operands(self, context):
+        operation = str(context['operation'])
+        op_type = operation.split('_')[1]
+        num_operands = self.op_type_table[op_type]
+        operation = operation[(4+len(op_type)):]
+        if operation in self.op_table:
+            operation = self.op_table[operation]
+        terms = [self._output_factory.atom(operation)]
+        for i in xrange(num_operands):
+            terms.append(self.dispatch(context['operands'][i]))
+        return self._output_factory.concat(terms)
 
     def print_type(self, context):
         if context['base_type'] == gdb.parse_and_eval('GLSL_TYPE_ARRAY'):
