@@ -412,7 +412,16 @@ class InsnPrinter(PrinterBase):
         # TODO: ir_return
         # TODO: ir_discard
         # TODO: ir_if
-        # TODO: ir_loop
+        self.register('ir_loop', self.sexp(
+                self.label,
+                self.literal('loop'),
+                self.sexp(self.maybe('counter')),
+                self.sexp(self.maybe('from')),
+                self.sexp(self.maybe('to')),
+                self.sexp(self.maybe('increment')),
+                self.sexp(
+                    self.newline,
+                    self.field('body_instructions'))))
         # TODO: ir_loop_jump
 
     def print_expr_operator_and_operands(self, context):
