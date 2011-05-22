@@ -379,7 +379,11 @@ class InsnPrinter(PrinterBase):
                 self.field('type'),
                 self.print_expr_operator_and_operands))
         # TODO: ir_texture
-        # TODO: ir_swizzle
+        self.register('ir_swizzle', self.sexp(
+                self.label,
+                self.literal('swiz'),
+                self.field('mask', self.print_swizzle_mask),
+                self.field('val')))
         self.register('ir_dereference_variable', self.sexp(
                 self.label,
                 self.literal('var_ref'),
@@ -427,6 +431,12 @@ class InsnPrinter(PrinterBase):
         for i in xrange(4):
             if (write_mask & (1 << i)) != 0:
                 mask += "xyzw"[i]
+        return self._output_factory.atom(mask)
+
+    def print_swizzle_mask(self, context):    
+        mask = ""
+        for i in xrange(int(context['num_components'])):
+            mask += "xyzw"[int(context["xyzw"[i]])]
         return self._output_factory.atom(mask)
 
 
