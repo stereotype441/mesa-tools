@@ -501,6 +501,14 @@ class InsnPrinter(PrinterBase):
                     self._output_factory.atom(str(matrix[i])))
         return self._output_factory.close(accumulator)
 
+class AstPrinter(PrinterBase):
+    def __init__(self, output_factory, history = None):
+        PrinterBase.__init__(self, output_factory, history)
+
+        self.register(
+            'exec_list',
+            self.iterate('ast_node', self.dispatch, self.newline))
+
 
 
 # User-accessible commands and convenience functions.
@@ -538,3 +546,4 @@ class DumpCmd(gdb.Command):
                 self._printer(factory, self._history).dispatch(value)))
 
 DumpCmd('ir', InsnPrinter)
+DumpCmd('ast', AstPrinter)
