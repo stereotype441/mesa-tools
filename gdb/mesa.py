@@ -91,10 +91,10 @@ class PrinterBase(object):
         and if it is, executes its second argument on the value of
         that field.
 
-        If there is no second argument, it simply prints the name of
-        the field."""
+        If there is no second argument, it simply executes
+        dispatch."""
         if printer is None:
-            printer = self.literal(field)
+            printer = self.dispatch
         def f(context):
             value = context[field]
             if value:
@@ -347,8 +347,8 @@ class InsnPrinter(PrinterBase):
                 self.label,
                 self.literal('declare'),
                 self.sexp(
-                    self.maybe('centroid'),
-                    self.maybe('invariant'),
+                    self.maybe('centroid', self.literal('centroid')),
+                    self.maybe('invariant', self.literal('invariant')),
                     self.field(
                         'mode', self.cast('ir_variable_mode', self.value(
                                 prefix='ir_var_', default='auto'))),
@@ -399,7 +399,7 @@ class InsnPrinter(PrinterBase):
         self.register('ir_assignment', self.sexp(
                 self.label,
                 self.literal('assign'),
-                self.maybe('condition', self.dispatch),
+                self.maybe('condition'),
                 self.sexp(self.field('write_mask', self.print_write_mask)),
                 self.field('lhs'),
                 self.field('rhs')))
