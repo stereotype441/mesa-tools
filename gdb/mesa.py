@@ -277,9 +277,8 @@ class SimpleOutputFactory(object):
         space_needed = False
         for item in items:
             if item is None:
-                if space_needed:
-                    results.append('\n' + prefix)
-                    space_needed = False
+                results.append('\n' + prefix)
+                space_needed = False
             else:
                 if space_needed:
                     results.append(' ')
@@ -411,7 +410,14 @@ class InsnPrinter(PrinterBase):
         # TODO: ir_call
         # TODO: ir_return
         # TODO: ir_discard
-        # TODO: ir_if
+        self.register('ir_if', self.sexp(
+                self.label,
+                self.literal('if'),
+                self.field('condition'),
+                self.newline,
+                self.sexp(self.field('then_instructions')),
+                self.newline,
+                self.sexp(self.field('else_instructions'))))
         self.register('ir_loop', self.sexp(
                 self.label,
                 self.literal('loop'),
