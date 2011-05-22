@@ -61,7 +61,7 @@ class GenericDowncaster(object):
         self.__base_class = base_class
         self.__allowed_starting_types = {base_class: True}
         self.__found_types = {}
-        self.__vtable_entry_regexp = re.compile('<([a-zA-Z0-9_]+)::')
+        self.__typeinfo_regexp = re.compile('<typeinfo for (.*)>')
 
     def is_allowed_starting_type(self, t):
         if t.code != gdb.TYPE_CODE_STRUCT:
@@ -79,9 +79,9 @@ class GenericDowncaster(object):
         if not self.is_allowed_starting_type(value.type):
             raise Exception("Not derived from %s: %s" %
                             (self.__base_class, value))
-        vtable_entry = str(value['_vptr.%s' % self.__base_class][0])
+        vtable_entry = str(value['_vptr.%s' % self.__base_class][-1])
         print vtable_entry
-        m = self.__vtable_entry_regexp.search(vtable_entry)
+        m = self.__typeinfo_regexp.search(vtable_entry)
         derived_class_name = m.group(1)
         if derived_class_name not in self.__found_types:
             self.__found_types[derived_class_name] = gdb.lookup_type(
