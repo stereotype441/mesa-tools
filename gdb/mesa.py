@@ -178,7 +178,7 @@ class PrinterBase(object):
         addr = context.address
         if addr and self._history:
             return self._output_factory.atom(
-                "$ir(%s):" % self._history.add(addr))
+                "$%s(%s):" % (self._history.label, self._history.add(addr)))
         else:
             return self._output_factory.none()
 
@@ -220,12 +220,17 @@ def iter_exec_list(exec_list):
 
 
 
-# IR history (used to output labels)
+# History (used to output labels)
 
-class IrHistory(object):
-    def __init__(self):
+class History(object):
+    def __init__(self, label):
         self._values = []
         self._reverse = {}
+        self._label = label
+
+    @property
+    def label(self):
+        return self._label
 
     def add(self, addr):
         key = (str(addr.type), str(addr))
@@ -502,7 +507,7 @@ class InsnPrinter(PrinterBase):
 
 class ReadHistory(gdb.Function):
     def __init__(self, history):
-        gdb.Function.__init__(self, "ir")
+        gdb.Function.__init__(self, history.label)
         self._history = history
 
     def invoke(self, i):
@@ -510,11 +515,12 @@ class ReadHistory(gdb.Function):
             raise Exception("Need an int")
         return self._history.get(int(i))
 
-class DumpIr(gdb.Command):
-    def __init__(self):
-        self._history = IrHistory()
+class DumpCmd(gdb.Command):
+    def __init__(self, label, printer):
+        self._history = History(label)
+        self._printer = printer
         ReadHistory(self._history)
-        gdb.Command.__init__(self, "dump_ir",
+        gdb.Command.__init__(self, "dump_%s" % label,
                              gdb.COMMAND_DATA, # display in help for data cmds
                              gdb.COMPLETE_SYMBOL # autocomplete with symbols
                              )
@@ -529,6 +535,6 @@ class DumpIr(gdb.Command):
         factory = SimpleOutputFactory()
         gdb.write(
             factory.pretty_print(
-                InsnPrinter(factory, self._history).dispatch(value)))
+                self._printer(factory, self._history).dispatch(value)))
 
-DumpIr()
+DumpCmd('ir', InsnPrinter)
