@@ -1,5 +1,6 @@
 import traceback
 import sys
+import re
 
 
 # Helper functions
@@ -48,6 +49,45 @@ class InsnDowncaster(object):
             self.__found_types[ir_class_name] = gdb.lookup_type(ir_class_name)
         ir_class = self.__found_types[ir_class_name]
         return value.cast(ir_class)
+
+class GenericDowncaster(object):
+    """An instance of this class can be called to downcast an object
+    with a vtable to its derived type.  The object is automatically
+    dereferenced fully.
+
+    This is a class rather than a simple function to allow caching,
+    and to expose the is_allowed_starting_type() method."""
+    def __init__(self, base_class):
+        self.__base_class = base_class
+        self.__allowed_starting_types = {base_class: True}
+        self.__found_types = {}
+        self.__vtable_entry_regexp = re.compile('<([a-zA-Z0-9_]+)::')
+
+    def is_allowed_starting_type(self, t):
+        if t.code != gdb.TYPE_CODE_STRUCT:
+            return False
+        if t.tag not in self.__allowed_starting_types:
+            if any(self.is_allowed_starting_type(base)
+                   for base in get_base_types(t)):
+                self.__allowed_starting_types[t.tag] = True
+            else:
+                self.__allowed_starting_types[t.tag] = False
+        return self.__allowed_starting_types[t.tag]
+
+    def __call__(self, value):
+        value = fully_deref(value)
+        if not self.is_allowed_starting_type(value.type):
+            raise Exception("Not derived from %s: %s" %
+                            (self.__base_class, value))
+        vtable_entry = str(value['_vptr.%s' % self.__base_class][0])
+        print vtable_entry
+        m = self.__vtable_entry_regexp.search(vtable_entry)
+        derived_class_name = m.group(1)
+        if derived_class_name not in self.__found_types:
+            self.__found_types[derived_class_name] = gdb.lookup_type(
+                derived_class_name)
+        derived_class = self.__found_types[derived_class_name]
+        return value.cast(derived_class)
 
 
 
@@ -154,15 +194,35 @@ class PrinterBase(object):
         """Printer that forces a newline to be output."""
         return self._output_factory.newline()
 
-    def iterate(self, cast_type, *printers):
-        """Printer that iterates over the current context (which
-        should be an exec_list), casts the results to the given type,
-        and executes each argument on the results."""
+    def cast_adjuster(self, cast_type):
+        """Create an adjuster that adjusts by casting to the given
+        type."""
         cast_type = gdb.lookup_type(cast_type)
+        return lambda value: value.cast(cast_type)
+
+    def offset_adjuster(self, final_type, field_name):
+        """Create an adjuster that adjusts by assuming the input value
+        is a field of final_type, and locates the final_type."""
+        final_type = gdb.lookup_type(final_type)
+        final_ptr = final_type.pointer()
+        char_ptr = gdb.lookup_type('char').pointer()
+        field_info = None
+        for field in final_type.fields():
+            if field.name == field_name:
+                field_info = field
+        offset = field_info.bitpos / 8
+        def f(value):
+            return value.address.cast(char_ptr)[-offset].address.cast(final_ptr).dereference()
+        return f
+
+    def iterate(self, adjuster, *printers):
+        """Printer that iterates over the current context (which
+        should be an exec_list), adjusts the results using adjuster,
+        and executes each argument on the results."""
         def f(context):
             result = []
             for p in iter_exec_list(context):
-                item = p.dereference().cast(cast_type)
+                item = adjuster(p.dereference())
                 for printer in printers:
                     try:
                         result.append(printer(item))
@@ -346,7 +406,8 @@ class InsnPrinter(PrinterBase):
             self.field('length'))
         self.register(
             'exec_list',
-            self.iterate('ir_instruction', self.dispatch, self.newline))
+            self.iterate(self.cast_adjuster('ir_instruction'),
+                         self.dispatch, self.newline))
         self.register('ir_variable', self.sexp(
                 self.label,
                 self.literal('declare'),
@@ -371,7 +432,8 @@ class InsnPrinter(PrinterBase):
                 self.sexp(self.literal('parameters'),
                      self.field(
                         'parameters', self.iterate(
-                            'ir_variable', self.dispatch, self.newline))),
+                            self.cast_adjuster('ir_variable'),
+                            self.dispatch, self.newline))),
                 self.newline,
                 self.sexp(self.field('body'))))
         self.register('ir_function', self.sexp(
@@ -381,8 +443,8 @@ class InsnPrinter(PrinterBase):
                 self.newline,
                 self.field(
                     'signatures',
-                    self.iterate('ir_function_signature', self.dispatch,
-                                 self.newline))))
+                    self.iterate(self.cast_adjuster('ir_function_signature'),
+                                 self.dispatch, self.newline))))
         self.register('ir_expression', self.sexp(
                 self.label,
                 self.literal('expression'),
@@ -505,9 +567,13 @@ class AstPrinter(PrinterBase):
     def __init__(self, output_factory, history = None):
         PrinterBase.__init__(self, output_factory, history)
 
+        self.ast_downcast = GenericDowncaster('ast_node')
+        print_ast = lambda v: self.dispatch(self.ast_downcast(v))
+        self.register('ast_node', print_ast)
         self.register(
             'exec_list',
-            self.iterate('ast_node', self.dispatch, self.newline))
+            self.iterate(self.offset_adjuster('ast_node', 'link'),
+                         self.dispatch, self.newline))
 
 
 
