@@ -323,6 +323,12 @@ class InsnPrinter(PrinterBase):
             'logic_xor': "^^",
             'logic_or': "||",
             }
+        self.base_type_to_union_selector = {
+            'GLSL_TYPE_UINT': 'u',
+            'GLSL_TYPE_INT': 'i',
+            'GLSL_TYPE_FLOAT': 'f',
+            'GLSL_TYPE_BOOL': 'b',
+            }
 
         self.insn_downcast = InsnDowncaster()
         print_insn = lambda v: self.dispatch(self.insn_downcast(v))
@@ -397,7 +403,11 @@ class InsnPrinter(PrinterBase):
                 self.sexp(self.field('write_mask', self.print_write_mask)),
                 self.field('lhs'),
                 self.field('rhs')))
-        # TODO: ir_constant
+        self.register('ir_constant', self.sexp(
+                self.label,
+                self.literal('constant'),
+                self.field('type'),
+                self.print_constant_value))
         # TODO: ir_call
         # TODO: ir_return
         # TODO: ir_discard
@@ -439,6 +449,35 @@ class InsnPrinter(PrinterBase):
             mask += "xyzw"[int(context["xyzw"[i]])]
         return self._output_factory.atom(mask)
 
+    def print_constant_value(self, context):
+        ir_type = context['type']
+        glsl_base_type = str(ir_type['base_type'])
+        accumulator = self._output_factory.open()
+        if glsl_base_type == 'GLSL_TYPE_ARRAY':
+            for i in xrange(int(ir_type['length'])):
+                self._output_factory.extend(
+                    accumulator, self.dispatch(context['array_elements'][i]))
+        elif glsl_base_type == 'GLSL_TYPE_STRUCT':
+            components = list(iter_exec_list(context['components']))
+            for i in xrange(int(ir_type['length'])):
+                struct_elem = self._output_factory.open()
+                self._output_factory.extend(
+                    struct_elem, self._output_factory.atom(
+                        ir_type['fields']['structure'][i]['name'].string()))
+                self._output_factory.extend(
+                    struct_elem, self.dispatch(components[i]))
+                self._output_factory.extend(
+                    accumulator, self._output_factory.close(struct_elem))
+        else:
+            num_components = int(ir_type['vector_elements']) \
+                * int(ir_type['matrix_columns'])
+            union_selector = self.base_type_to_union_selector[glsl_base_type]
+            matrix = context['value'][union_selector]
+            for i in xrange(num_components):
+                self._output_factory.extend(
+                    accumulator,
+                    self._output_factory.atom(str(matrix[i])))
+        return self._output_factory.close(accumulator)
 
 
 
