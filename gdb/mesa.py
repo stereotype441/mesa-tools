@@ -428,7 +428,9 @@ class InsnPrinter(PrinterBase):
                 self.sexp(
                     self.newline,
                     self.field('body_instructions'))))
-        # TODO: ir_loop_jump
+        self.register(
+            'ir_loop_jump', self.field(
+                'mode', self.value(prefix='ir_loop_jump::jump_')))
 
     def print_expr_operator_and_operands(self, context):
         operation = str(context['operation'])
