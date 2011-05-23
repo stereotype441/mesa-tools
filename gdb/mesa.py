@@ -16,40 +16,6 @@ def get_base_types(t):
         return []
     return [field.type for field in t.fields() if field.is_base_class]
 
-class InsnDowncaster(object):
-    """An instance of this class can be called to downcast an
-    instruction to its derived type.  The instruction is automatically
-    dereferenced fully.
-
-    This is a class rather than a simple function to allow caching,
-    and to expose the is_allowed_starting_type() method."""
-    def __init__(self):
-        self.__allowed_starting_types = {"ir_instruction": True}
-        self.__found_types = {}
-
-    def is_allowed_starting_type(self, t):
-        if t.code != gdb.TYPE_CODE_STRUCT:
-            return False
-        if t.tag not in self.__allowed_starting_types:
-            if any(self.is_allowed_starting_type(base)
-                   for base in get_base_types(t)):
-                self.__allowed_starting_types[t.tag] = True
-            else:
-                self.__allowed_starting_types[t.tag] = False
-        return self.__allowed_starting_types[t.tag]
-
-    def __call__(self, value):
-        value = fully_deref(value)
-        if not self.is_allowed_starting_type(value.type):
-            raise Exception("Not an instruction: %s" % value)
-        ir_type = value['ir_type']
-        ir_type_str = str(ir_type)
-        ir_class_name = ir_type_str.replace('ir_type_', 'ir_')
-        if ir_class_name not in self.__found_types:
-            self.__found_types[ir_class_name] = gdb.lookup_type(ir_class_name)
-        ir_class = self.__found_types[ir_class_name]
-        return value.cast(ir_class)
-
 class GenericDowncaster(object):
     """An instance of this class can be called to downcast an object
     with a vtable to its derived type.  The object is automatically
@@ -377,7 +343,7 @@ class InsnPrinter(PrinterBase):
             'GLSL_TYPE_BOOL': 'b',
             }
 
-        self.insn_downcast = InsnDowncaster()
+        self.insn_downcast = GenericDowncaster('ir_instruction')
         print_insn = lambda v: self.dispatch(self.insn_downcast(v))
         self.register('ir_instruction', print_insn)
         self.register('ir_dereference', print_insn)
