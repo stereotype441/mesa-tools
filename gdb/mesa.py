@@ -516,6 +516,16 @@ class AstPrinter(PrinterBase):
     def __init__(self, output_factory, history = None):
         PrinterBase.__init__(self, output_factory, history)
 
+        self.unary_ops = ('ast_plus', 'ast_neg', 'ast_bit_not',
+                          'ast_logic_not', 'ast_pre_inc', 'ast_pre_dec',
+                          'post_inc', 'post_dec')
+        self.constant_types = {
+            'ast_int_constant': 'int_constant',
+            'ast_uint_constant': 'uint_constant',
+            'ast_float_constant': 'float_constant',
+            'ast_bool_constant': 'bool_constant'
+            }
+
         self.ast_downcast = GenericDowncaster('ast_node')
         print_ast = lambda v: self.dispatch(self.ast_downcast(v))
         self.register('ast_node', print_ast)
@@ -523,6 +533,124 @@ class AstPrinter(PrinterBase):
             'exec_list',
             self.iterate(self.offset_adjuster('ast_node', 'link'),
                          self.dispatch, self.newline))
+        self.register('ast_declarator_list', self.sexp(
+                self.label,
+                self.literal('declarator_list'),
+                self.maybe('type'),
+                self.maybe('invariant', self.literal('invariant')),
+                self.newline,
+                self.field('declarations')))
+        self.register('ast_fully_specified_type', self.sexp(
+                self.label,
+                self.literal('type'),
+                self.field('qualifier'),
+                self.field('specifier')))
+        self.register('ast_type_qualifier', self.print_ast_type_qualifier)
+        self.register('ast_type_specifier', self.print_ast_type_specifier)
+        self.register('ast_declaration', self.sexp(
+                self.label,
+                self.literal('declaration'),
+                self.field('identifier', self.string),
+                self.print_opt_array_size,
+                self.maybe('initializer')))
+        self.register('ast_function_definition', self.sexp(
+                self.label,
+                self.literal('function_definition'),
+                self.field('prototype'),
+                self.newline,
+                self.field('body')))
+        self.register('ast_function', self.sexp(
+                self.label,
+                self.literal('function'),
+                self.field('return_type'),
+                self.field('identifier', self.string),
+                self.field('parameters')))
+        self.register('ast_compound_statement', self.sexp(
+                self.label,
+                self.literal('compound_statement'),
+                self.newline,
+                self.field('statements')))
+        self.register('ast_expression_statement', self.sexp(
+                self.label,
+                self.literal('expression_statement'),
+                self.maybe('expression')))
+        self.register('ast_expression', self.sexp(
+                self.label,
+                self.print_expression_details))
+
+    def print_expression_details(self, context):
+        result = []
+        op = str(context['oper'])
+        result.append(self._output_factory.atom(op.replace('ast_', '')))
+        if op == 'ast_field_selection':
+            result.append(
+                self.string(context['primary_expression']['identifier']))
+        elif op in self.unary_ops:
+            result.append(self.dispatch(context['subexpressions'][0]))
+        elif op == 'ast_conditional':
+            result.append(self.dispatch(context['subexpressions'][0]))
+            result.append(self.dispatch(context['subexpressions'][1]))
+            result.append(self.dispatch(context['subexpressions'][2]))
+        elif op == 'ast_function_call':
+            result.append(self.dispatch(context['subexpressions'][0]))
+            result.append(self.dispatch(context['expressions']))
+        elif op == 'ast_identifier':
+            result.append(
+                self._output_factory.atom(
+                    context['primary_expression']['identifier'].string()))
+        elif op in self.constant_types:
+            resulp.append(
+                self._output_factory.atom(
+                    str(context['primary_expression'][self.constant_types[op]])))
+        elif op == 'ast_sequence':
+            result.append(self.dispatch(context['expressions']))
+        else:
+            result.append(self.dispatch(context['subexpressions'][0]))
+            result.append(self.dispatch(context['subexpressions'][1]))
+        return self._output_factory.concat(result)
+
+    def print_opt_array_size(self, context):
+        if context['is_array']:
+            return self._output_factory.atom(
+                '[%s]' % int(context['array_size']))
+        else:
+            return self._output_factory.none()
+
+    def print_ast_type_specifier(self, context):
+        if str(context['type_specifier']) == 'ast_struct':
+            return self.dispatch(context['structure'])
+        else:
+            return self._output_factory.atom(context['type_name'].string())
+
+    def print_ast_type_qualifier(self, q):
+        words = []
+        if q['flags']['q']['constant']:
+            words.append("const")
+        if q['flags']['q']['invariant']:
+            words.append("invariant")
+        if q['flags']['q']['attribute']:
+            words.append("attribute")
+        if q['flags']['q']['varying']:
+            words.append("varying")
+        if q['flags']['q']['in'] and q['flags']['q']['out']:
+            words.append("inout")
+        else:
+            if q['flags']['q']['in']:
+                words.append("in")
+            if q['flags']['q']['out']:
+                words.append("out")
+        if q['flags']['q']['centroid']:
+            words.append("centroid")
+        if q['flags']['q']['uniform']:
+            words.append("uniform")
+        if q['flags']['q']['smooth']:
+            words.append("smooth")
+        if q['flags']['q']['flat']:
+            words.append("flat")
+        if q['flags']['q']['noperspective']:
+            words.append("noperspective")
+        return self._output_factory.concat(
+            [self._output_factory.atom(w) for w in words])
 
 
 
