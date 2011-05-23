@@ -551,14 +551,12 @@ class DumpCmd(gdb.Command):
     def invoke(self, argument, from_tty):
         value = gdb.parse_and_eval(argument)
         value = fully_deref(value)
-        if value.type != gdb.lookup_type("exec_list"):
-            raise Exception(
-                "%s is not an exec_list (or a pointer/reference to one)" %
-                (value,))
         factory = SimpleOutputFactory()
-        gdb.write(
-            factory.pretty_print(
-                self._printer(factory, self._history).dispatch(value)))
+        s = factory.pretty_print(
+                self._printer(factory, self._history).dispatch(value))
+        if not s.endswith('\n'):
+            s += '\n'
+        gdb.write(s)
 
 DumpCmd('ir', InsnPrinter)
 DumpCmd('ast', AstPrinter)
