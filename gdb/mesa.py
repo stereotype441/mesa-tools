@@ -1,42 +1,43 @@
 import traceback
 import sys
 import re
+import collections
 
 
 # Helper functions
+
+def TODO(*detail):
+    raise Exception("TODO({0})".format(', '.join(repr(s) for s in detail)))
+
+class label(object):
+    def __init__(self, value):
+        assert isinstance(value, gdb.Value)
+        self.__value = value
+
+    @property
+    def value(self):
+        return self.__value
+
+class newline(object):
+    pass
+
+NEWLINE = newline()
+
+def shorten(s, prefix, discard = None):
+    """Shorten string s by removing prefix (if present).  Then, if s
+    == discard, shorten to None.
+
+    Paramter discard is optional."""
+    if s.startswith(prefix):
+        s = s[len(prefix):]
+    if s == discard:
+        return None
+    return s
 
 def fully_deref(value):
     while value.type.code == gdb.TYPE_CODE_PTR:
         value = value.dereference()
     return value
-
-def get_base_types(t):
-    """Given a gdb.Type, return a list of the types of the base classes."""
-    if t.code != gdb.TYPE_CODE_STRUCT:
-        return []
-    return [field.type for field in t.fields() if field.is_base_class]
-
-class GenericDowncaster(object):
-    """An instance of this class can be called to downcast an object
-    with a vtable to its derived type.  The object is automatically
-    dereferenced fully.
-
-    This is a class rather than a simple function to allow caching."""
-    def __init__(self, base_class):
-        self.__base_class = base_class
-        self.__found_types = {}
-        self.__typeinfo_regexp = re.compile('<typeinfo for (.*)>')
-
-    def __call__(self, value):
-        value = fully_deref(value)
-        vtable_entry = str(value['_vptr.%s' % self.__base_class][-1])
-        m = self.__typeinfo_regexp.search(vtable_entry)
-        derived_class_name = m.group(1)
-        if derived_class_name not in self.__found_types:
-            self.__found_types[derived_class_name] = gdb.lookup_type(
-                derived_class_name)
-        derived_class = self.__found_types[derived_class_name]
-        return value.cast(derived_class)
 
 
 
@@ -55,131 +56,6 @@ class PrinterBase(object):
     def __init__(self, output_factory, history = None):
         self._output_factory = output_factory
         self._history = history
-        self._registered_printers = {}
-
-    def sexp(self, *printers):
-        """Create a printer that outputs the result of running its
-        arguments, enclosed in parentheses."""
-        def f(context):
-            items = self._output_factory.open()
-            for printer in printers:
-                try:
-                    self._output_factory.extend(items, printer(context))
-                except Exception, e:
-                    self._output_factory.extend(
-                        items, self._output_factory.error(sys.exc_info(), e))
-            return self._output_factory.close(items)
-        return f
-
-    def literal(self, s):
-        """Create a printer that outputs the given literal atom."""
-        return lambda context: self._output_factory.atom(s)
-
-    def maybe(self, field, printer = None):
-        """Create a printer that checks if the given field is nonzero,
-        and if it is, executes its second argument on the value of
-        that field.
-
-        If there is no second argument, it simply executes
-        dispatch."""
-        if printer is None:
-            printer = self.dispatch
-        def f(context):
-            value = context[field]
-            if value:
-                return printer(value)
-            else:
-                return self._output_factory.none()
-        return f
-
-    def field(self, field, printer = None):
-        """Create a printer that executes its second argument on the
-        value of the given field.
-
-        If no second argument is given, it defaults to
-        self.dispatch."""
-        if not printer:
-            printer = self.dispatch
-        return lambda context: printer(context[field])
-
-    def deref(self, printer):
-        """Create a printer that executes its second argument after
-        dereferencing the value."""
-        return lambda context: printer(context.dereference())
-
-    def cast(self, cast_type, printer):
-        """Create a printer that casts the value to the new type and
-        then runs the given printer on the result."""
-        cast_type = gdb.lookup_type(cast_type)
-        def f(context):
-            return printer(context.cast(cast_type))
-        return f
-
-    def string(self, context):
-        """Printer that uses the raw string value."""
-        return self._output_factory.atom(context.string())
-
-    def value(self, prefix=None, default=None):
-        """Create a printer that converts the context to a string and
-        outputs it as an atom.  If a prefix is given, it is stripped
-        from the beginning of the string.  If a default is given, and
-        it matches the string (after stripping the prefix), then
-        nothing is output."""
-        def f(context):
-            s = str(context)
-            if prefix and s.startswith(prefix):
-                s = s[len(prefix):]
-            if default and s == default:
-                return self._output_factory.none()
-            return self._output_factory.atom(s)
-        return f
-
-    def unique(self, context):
-        """Printer that evaluates the value as a string and outputs a
-        uniquified version of it."""
-        return self._output_factory.unique_atom(context.string())
-
-    def newline(self, context):
-        """Printer that forces a newline to be output."""
-        return self._output_factory.newline()
-
-    def cast_adjuster(self, cast_type):
-        """Create an adjuster that adjusts by casting to the given
-        type."""
-        cast_type = gdb.lookup_type(cast_type)
-        return lambda value: value.cast(cast_type)
-
-    def offset_adjuster(self, final_type, field_name):
-        """Create an adjuster that adjusts by assuming the input value
-        is a field of final_type, and locates the final_type."""
-        final_type = gdb.lookup_type(final_type)
-        final_ptr = final_type.pointer()
-        char_ptr = gdb.lookup_type('char').pointer()
-        field_info = None
-        for field in final_type.fields():
-            if field.name == field_name:
-                field_info = field
-        offset = field_info.bitpos / 8
-        def f(value):
-            return value.address.cast(char_ptr)[-offset].address.cast(final_ptr).dereference()
-        return f
-
-    def iterate(self, adjuster, *printers):
-        """Printer that iterates over the current context (which
-        should be an exec_list), adjusts the results using adjuster,
-        and executes each argument on the results."""
-        def f(context):
-            result = []
-            for p in iter_exec_list(context):
-                item = adjuster(p.dereference())
-                for printer in printers:
-                    try:
-                        result.append(printer(item))
-                    except Exception, e:
-                        result.append(
-                            self._output_factory.error(sys.exc_info(), e))
-            return self._output_factory.concat(result)
-        return f
 
     def label(self, context):
         """Printer that creates a label of the form "$ir(999):", so
@@ -191,35 +67,34 @@ class PrinterBase(object):
         else:
             return self._output_factory.none()
 
-    def register(self, tag, printer):
-        """Record that the given printer can be used to print the
-        given type."""
-        self._registered_printers[tag] = printer
-
-    def fallback(self, context):
-        """Printer that is used as a fallback if the type to be
-        printed was not registered.  May be overridden."""
-        atom = self._output_factory.atom(str(context))
-        if context.type.code == gdb.TYPE_CODE_STRUCT:
-            s = self._output_factory.open()
-            self._output_factory.extend(s, self.label(context))
-            self._output_factory.extend(s, atom)
-            return self._output_factory.close(s)
-        else:
-            return atom
-
-    def dispatch(self, context):
-        """Dispatch to a registered printer based on type."""
-        typ = context.type
-        if typ.code == gdb.TYPE_CODE_PTR and \
-                typ.target().code == gdb.TYPE_CODE_INT and \
-                typ.target().sizeof == 1: # char *
-            return self._output_factory.atom(str(context))
-        context = fully_deref(context)
-        tag = context.type.tag
-        if tag and tag in self._registered_printers:
-            return self._registered_printers[tag](context)
-        return self.fallback(context)
+    def printer(self, decoding_fn):
+        """Create a printer based on a decoding function."""
+        def traverse(sexp):
+            while isinstance(sexp, gdb.Value):
+                try:
+                    sexp = decode(sexp)
+                except Exception, e:
+                    accumulator = self._output_factory.open()
+                    self._output_factory.extend(accumulator, self.label(sexp))
+                    self._output_factory.extend(
+                        accumulator,
+                        self._output_factory.error(sys.exc_info(), e))
+                    return self._output_factory.close(accumulator)
+            if isinstance(sexp, basestring):
+                return self._output_factory.atom(sexp)
+            if isinstance(sexp, label):
+                return self.label(sexp.value)
+            if sexp is None:
+                return self._output_factory.none()
+            if isinstance(sexp, newline):
+                return self._output_factory.newline()
+            if isinstance(sexp, collections.Iterable):
+                accumulator = self._output_factory.open()
+                for item in sexp:
+                    self._output_factory.extend(accumulator, traverse(item))
+                return self._output_factory.close(accumulator)
+            TODO(sexp)
+        return lambda context: traverse(decoding_fn(context))
 
 def iter_exec_list(exec_list):
     p = exec_list['head'] # exec_node *
@@ -277,9 +152,6 @@ class SimpleOutputFactory(object):
     def atom(self, s):
         return [s]
 
-    def unique_atom(self, s):
-        return [s] # TODO: uniquify
-
     def newline(self):
         return [None]
 
@@ -306,354 +178,6 @@ class SimpleOutputFactory(object):
 
 
 
-# Specific printers for various types.
-
-class InsnPrinter(PrinterBase):
-    def __init__(self, output_factory, history = None):
-        PrinterBase.__init__(self, output_factory, history)
-
-        self.op_type_table = { 'unop': 1, 'binop': 2, 'quadop': 4 }
-        self.op_table = {
-            'bit_not': "~",
-            'logic_not': "!",
-            'add': "+",
-            'sub': "-",
-            'mul': "*",
-            'div': "/",
-            'mod': "%",
-            'less': "<",
-            'greater': ">",
-            'lequal': "<=",
-            'gequal': ">=",
-            'equal': "==",
-            'nequal': "!=",
-            'lshift': "<<",
-            'rshift': ">>",
-            'bit_and': "&",
-            'bit_xor': "^",
-            'bit_or': "|",
-            'logic_and': "&&",
-            'logic_xor': "^^",
-            'logic_or': "||",
-            }
-        self.base_type_to_union_selector = {
-            'GLSL_TYPE_UINT': 'u',
-            'GLSL_TYPE_INT': 'i',
-            'GLSL_TYPE_FLOAT': 'f',
-            'GLSL_TYPE_BOOL': 'b',
-            }
-
-        self.insn_downcast = GenericDowncaster('ir_instruction')
-        print_insn = lambda v: self.dispatch(self.insn_downcast(v))
-        self.register('ir_instruction', print_insn)
-        self.register('ir_dereference', print_insn)
-        self.register('ir_rvalue', print_insn)
-        self.register('glsl_type', self.print_type)
-        self.print_array_type = self.sexp(
-            self.literal('array'),
-            self.field('fields', self.field('array')),
-            self.field('length'))
-        self.register(
-            'exec_list',
-            self.iterate(self.cast_adjuster('ir_instruction'),
-                         self.dispatch, self.newline))
-        self.register('ir_variable', self.sexp(
-                self.label,
-                self.literal('declare'),
-                self.sexp(
-                    self.maybe('centroid', self.literal('centroid')),
-                    self.maybe('invariant', self.literal('invariant')),
-                    self.field(
-                        'mode', self.cast('ir_variable_mode', self.value(
-                                prefix='ir_var_', default='auto'))),
-                    self.field(
-                        'interpolation',
-                        self.cast('ir_variable_interpolation', self.value(
-                                prefix='ir_var_', default='smooth')))),
-                self.field('type'),
-                self.field('name', self.unique)))
-        self.register('ir_function_signature', self.sexp(
-                # _mesa_symbol_table_push_scope(symbols)
-                self.label,
-                self.literal('signature'),
-                self.field('return_type'),
-                self.newline,
-                self.sexp(self.literal('parameters'),
-                     self.field(
-                        'parameters', self.iterate(
-                            self.cast_adjuster('ir_variable'),
-                            self.dispatch, self.newline))),
-                self.newline,
-                self.sexp(self.field('body'))))
-        self.register('ir_function', self.sexp(
-                self.label,
-                self.literal('function'),
-                self.field('name', self.string),
-                self.newline,
-                self.field(
-                    'signatures',
-                    self.iterate(self.cast_adjuster('ir_function_signature'),
-                                 self.dispatch, self.newline))))
-        self.register('ir_expression', self.sexp(
-                self.label,
-                self.literal('expression'),
-                self.field('type'),
-                self.print_expr_operator_and_operands))
-        # TODO: ir_texture
-        self.register('ir_swizzle', self.sexp(
-                self.label,
-                self.literal('swiz'),
-                self.field('mask', self.print_swizzle_mask),
-                self.field('val')))
-        self.register('ir_dereference_variable', self.sexp(
-                self.label,
-                self.literal('var_ref'),
-                self.field('var', self.deref(self.field('name', self.unique)))))
-        # TODO: ir_dereference_array
-        # TODO: ir_dereference_record
-        self.register('ir_assignment', self.sexp(
-                self.label,
-                self.literal('assign'),
-                self.maybe('condition'),
-                self.sexp(self.field('write_mask', self.print_write_mask)),
-                self.field('lhs'),
-                self.field('rhs')))
-        self.register('ir_constant', self.sexp(
-                self.label,
-                self.literal('constant'),
-                self.field('type'),
-                self.print_constant_value))
-        # TODO: ir_call
-        # TODO: ir_return
-        # TODO: ir_discard
-        self.register('ir_if', self.sexp(
-                self.label,
-                self.literal('if'),
-                self.field('condition'),
-                self.newline,
-                self.sexp(self.field('then_instructions')),
-                self.newline,
-                self.sexp(self.field('else_instructions'))))
-        self.register('ir_loop', self.sexp(
-                self.label,
-                self.literal('loop'),
-                self.sexp(self.maybe('counter')),
-                self.sexp(self.maybe('from')),
-                self.sexp(self.maybe('to')),
-                self.sexp(self.maybe('increment')),
-                self.sexp(
-                    self.newline,
-                    self.field('body_instructions'))))
-        self.register(
-            'ir_loop_jump', self.field(
-                'mode', self.value(prefix='ir_loop_jump::jump_')))
-
-    def print_expr_operator_and_operands(self, context):
-        operation = str(context['operation'])
-        op_type = operation.split('_')[1]
-        num_operands = self.op_type_table[op_type]
-        operation = operation[(4+len(op_type)):]
-        if operation in self.op_table:
-            operation = self.op_table[operation]
-        terms = [self._output_factory.atom(operation)]
-        for i in xrange(num_operands):
-            terms.append(self.dispatch(context['operands'][i]))
-        return self._output_factory.concat(terms)
-
-    def print_type(self, context):
-        if context['base_type'] == gdb.parse_and_eval('GLSL_TYPE_ARRAY'):
-            return self.print_array_type(context)
-        else:
-            return self._output_factory.atom(context['name'].string())
-
-    def print_write_mask(self, context):
-        write_mask = int(context)
-        if write_mask == 0:
-            return self._output_factory.none()
-        mask = ""
-        for i in xrange(4):
-            if (write_mask & (1 << i)) != 0:
-                mask += "xyzw"[i]
-        return self._output_factory.atom(mask)
-
-    def print_swizzle_mask(self, context):    
-        mask = ""
-        for i in xrange(int(context['num_components'])):
-            mask += "xyzw"[int(context["xyzw"[i]])]
-        return self._output_factory.atom(mask)
-
-    def print_constant_value(self, context):
-        ir_type = context['type']
-        glsl_base_type = str(ir_type['base_type'])
-        accumulator = self._output_factory.open()
-        if glsl_base_type == 'GLSL_TYPE_ARRAY':
-            for i in xrange(int(ir_type['length'])):
-                self._output_factory.extend(
-                    accumulator, self.dispatch(context['array_elements'][i]))
-        elif glsl_base_type == 'GLSL_TYPE_STRUCT':
-            components = list(iter_exec_list(context['components']))
-            for i in xrange(int(ir_type['length'])):
-                struct_elem = self._output_factory.open()
-                self._output_factory.extend(
-                    struct_elem, self._output_factory.atom(
-                        ir_type['fields']['structure'][i]['name'].string()))
-                self._output_factory.extend(
-                    struct_elem, self.dispatch(components[i]))
-                self._output_factory.extend(
-                    accumulator, self._output_factory.close(struct_elem))
-        else:
-            num_components = int(ir_type['vector_elements']) \
-                * int(ir_type['matrix_columns'])
-            union_selector = self.base_type_to_union_selector[glsl_base_type]
-            matrix = context['value'][union_selector]
-            for i in xrange(num_components):
-                self._output_factory.extend(
-                    accumulator,
-                    self._output_factory.atom(str(matrix[i])))
-        return self._output_factory.close(accumulator)
-
-class AstPrinter(PrinterBase):
-    def __init__(self, output_factory, history = None):
-        PrinterBase.__init__(self, output_factory, history)
-
-        self.unary_ops = ('ast_plus', 'ast_neg', 'ast_bit_not',
-                          'ast_logic_not', 'ast_pre_inc', 'ast_pre_dec',
-                          'post_inc', 'post_dec')
-        self.constant_types = {
-            'ast_int_constant': 'int_constant',
-            'ast_uint_constant': 'uint_constant',
-            'ast_float_constant': 'float_constant',
-            'ast_bool_constant': 'bool_constant'
-            }
-
-        self.ast_downcast = GenericDowncaster('ast_node')
-        print_ast = lambda v: self.dispatch(self.ast_downcast(v))
-        self.register('ast_node', print_ast)
-        self.register(
-            'exec_list',
-            self.iterate(self.offset_adjuster('ast_node', 'link'),
-                         self.dispatch, self.newline))
-        self.register('ast_declarator_list', self.sexp(
-                self.label,
-                self.literal('declarator_list'),
-                self.maybe('type'),
-                self.maybe('invariant', self.literal('invariant')),
-                self.newline,
-                self.field('declarations')))
-        self.register('ast_fully_specified_type', self.sexp(
-                self.label,
-                self.literal('type'),
-                self.field('qualifier'),
-                self.field('specifier')))
-        self.register('ast_type_qualifier', self.print_ast_type_qualifier)
-        self.register('ast_type_specifier', self.print_ast_type_specifier)
-        self.register('ast_declaration', self.sexp(
-                self.label,
-                self.literal('declaration'),
-                self.field('identifier', self.string),
-                self.print_opt_array_size,
-                self.maybe('initializer')))
-        self.register('ast_function_definition', self.sexp(
-                self.label,
-                self.literal('function_definition'),
-                self.field('prototype'),
-                self.newline,
-                self.field('body')))
-        self.register('ast_function', self.sexp(
-                self.label,
-                self.literal('function'),
-                self.field('return_type'),
-                self.field('identifier', self.string),
-                self.field('parameters')))
-        self.register('ast_compound_statement', self.sexp(
-                self.label,
-                self.literal('compound_statement'),
-                self.newline,
-                self.field('statements')))
-        self.register('ast_expression_statement', self.sexp(
-                self.label,
-                self.literal('expression_statement'),
-                self.maybe('expression')))
-        self.register('ast_expression', self.sexp(
-                self.label,
-                self.print_expression_details))
-
-    def print_expression_details(self, context):
-        result = []
-        op = str(context['oper'])
-        result.append(self._output_factory.atom(op.replace('ast_', '')))
-        if op == 'ast_field_selection':
-            result.append(
-                self.string(context['primary_expression']['identifier']))
-        elif op in self.unary_ops:
-            result.append(self.dispatch(context['subexpressions'][0]))
-        elif op == 'ast_conditional':
-            result.append(self.dispatch(context['subexpressions'][0]))
-            result.append(self.dispatch(context['subexpressions'][1]))
-            result.append(self.dispatch(context['subexpressions'][2]))
-        elif op == 'ast_function_call':
-            result.append(self.dispatch(context['subexpressions'][0]))
-            result.append(self.dispatch(context['expressions']))
-        elif op == 'ast_identifier':
-            result.append(
-                self._output_factory.atom(
-                    context['primary_expression']['identifier'].string()))
-        elif op in self.constant_types:
-            result.append(
-                self._output_factory.atom(
-                    str(context['primary_expression'][self.constant_types[op]])))
-        elif op == 'ast_sequence':
-            result.append(self.dispatch(context['expressions']))
-        else:
-            result.append(self.dispatch(context['subexpressions'][0]))
-            result.append(self.dispatch(context['subexpressions'][1]))
-        return self._output_factory.concat(result)
-
-    def print_opt_array_size(self, context):
-        if context['is_array']:
-            return self._output_factory.atom(
-                '[%s]' % int(context['array_size']))
-        else:
-            return self._output_factory.none()
-
-    def print_ast_type_specifier(self, context):
-        if str(context['type_specifier']) == 'ast_struct':
-            return self.dispatch(context['structure'])
-        else:
-            return self._output_factory.atom(context['type_name'].string())
-
-    def print_ast_type_qualifier(self, q):
-        words = []
-        if q['flags']['q']['constant']:
-            words.append("const")
-        if q['flags']['q']['invariant']:
-            words.append("invariant")
-        if q['flags']['q']['attribute']:
-            words.append("attribute")
-        if q['flags']['q']['varying']:
-            words.append("varying")
-        if q['flags']['q']['in'] and q['flags']['q']['out']:
-            words.append("inout")
-        else:
-            if q['flags']['q']['in']:
-                words.append("in")
-            if q['flags']['q']['out']:
-                words.append("out")
-        if q['flags']['q']['centroid']:
-            words.append("centroid")
-        if q['flags']['q']['uniform']:
-            words.append("uniform")
-        if q['flags']['q']['smooth']:
-            words.append("smooth")
-        if q['flags']['q']['flat']:
-            words.append("flat")
-        if q['flags']['q']['noperspective']:
-            words.append("noperspective")
-        return self._output_factory.concat(
-            [self._output_factory.atom(w) for w in words])
-
-
-
 # User-accessible commands and convenience functions.
 
 class ReadHistory(gdb.Function):
@@ -667,9 +191,8 @@ class ReadHistory(gdb.Function):
         return self._history.get(int(i))
 
 class DumpCmd(gdb.Command):
-    def __init__(self, label, printer):
+    def __init__(self, label):
         self._history = History(label)
-        self._printer = printer
         ReadHistory(self._history)
         gdb.Command.__init__(self, "dump_%s" % label,
                              gdb.COMMAND_DATA, # display in help for data cmds
@@ -681,10 +204,325 @@ class DumpCmd(gdb.Command):
         value = fully_deref(value)
         factory = SimpleOutputFactory()
         s = factory.pretty_print(
-                self._printer(factory, self._history).dispatch(value))
+                PrinterBase(factory, self._history).printer(decode)(value))
         if not s.endswith('\n'):
             s += '\n'
         gdb.write(s)
 
-DumpCmd('ir', InsnPrinter)
-DumpCmd('ast', AstPrinter)
+DumpCmd('ir')
+DumpCmd('ast')
+
+
+def decode(x):
+    typ = x.type
+    if typ.code == gdb.TYPE_CODE_PTR and \
+            typ.target().code == gdb.TYPE_CODE_INT and \
+            typ.target().sizeof == 1: # char *
+        return str(x)
+    x = generic_downcast(fully_deref(x))
+    tag = x.type.tag
+    if tag:
+        decoder_name = 'decode_{0}'.format(tag)
+        if decoder_name in globals():
+            return globals()[decoder_name](x)
+    if x.type.code == gdb.TYPE_CODE_STRUCT:
+        return (label(x), str(x))
+    return str(x)
+
+def decode_glsl_type(x):
+    if str(x['base_type']) == 'GLSL_TYPE_ARRAY':
+        return ('array', x['fields']['array'], x['length'])
+    else:
+        return x['name'].string()
+
+def decode_ir_variable(x):
+    # TODO: uniquify name
+    return (
+        label(x), 'declare', (
+            ('centroid' if x['centroid'] else None),
+            ('invariant' if x['invariant'] else None),
+            shorten(
+                str(x['mode'].cast(gdb.lookup_type('ir_variable_mode'))),
+                'ir_var_', 'auto'),
+            shorten(
+                str(x['interpolation'].cast(
+                        gdb.lookup_type('ir_variable_interpolation'))),
+                'ir_var_', 'smooth')),
+        x['type'], x['name'])
+
+def decode_ir_function_signature(x):
+    param_list = ['parameters', NEWLINE]
+    for param in iter_exec_list(x['parameters']):
+        param_list.extend(
+            [x.dereference().cast(gdb.lookup_type('ir_variable')), NEWLINE])
+    return (
+        label(x), 'signature', x['return_type'], NEWLINE,
+        param_list, NEWLINE,
+        x['body'])
+
+def decode_ir_assignment(x):
+    write_mask = int(x['write_mask'])
+    write_mask_str = ""
+    for i in xrange(4):
+        if (write_mask & (1 << i)) != 0:
+            write_mask_str += "xyzw"[i]
+    return (
+        label(x), 'assign', x['condition'] or None, (write_mask_str or None,),
+        x['lhs'], x['rhs'])
+
+def decode_ir_dereference_variable(x):
+    # TODO: uniquify name
+    return (label(x), 'var_ref', x['var']['name'].string())
+
+OP_TYPE_TABLE = { 'unop': 1, 'binop': 2, 'quadop': 4 }
+OP_TABLE = {
+    'bit_not': "~",
+    'logic_not': "!",
+    'add': "+",
+    'sub': "-",
+    'mul': "*",
+    'div': "/",
+    'mod': "%",
+    'less': "<",
+    'greater': ">",
+    'lequal': "<=",
+    'gequal': ">=",
+    'equal': "==",
+    'nequal': "!=",
+    'lshift': "<<",
+    'rshift': ">>",
+    'bit_and': "&",
+    'bit_xor': "^",
+    'bit_or': "|",
+    'logic_and': "&&",
+    'logic_xor': "^^",
+    'logic_or': "||",
+    }
+
+def decode_ir_expression(x):
+    operation = str(x['operation'])
+    op_type = operation.split('_')[1]
+    num_operands = OP_TYPE_TABLE[op_type]
+    operation = operation[(4+len(op_type)):]
+    if operation in OP_TABLE:
+        operation = OP_TABLE[operation]
+    return [label(x), 'expression', x['type'], operation] + \
+        [x['operands'][i] for i in xrange(num_operands)]
+
+def decode_ir_swizzle(x):
+    swizzle_mask = ""
+    for i in xrange(int(x['mask']['num_components'])):
+        swizzle_mask += "xyzw"[int(x['mask']["xyzw"[i]])]
+    return (label(x), 'swiz', swizzle_mask, x['val'])
+
+BASE_TYPE_TO_UNION_SELECTOR = {
+    'GLSL_TYPE_UINT': 'u',
+    'GLSL_TYPE_INT': 'i',
+    'GLSL_TYPE_FLOAT': 'f',
+    'GLSL_TYPE_BOOL': 'b',
+    }
+
+def decode_ir_constant(x):
+    ir_type = x['type']
+    glsl_base_type = str(ir_type['base_type'])
+    if glsl_base_type == 'GLSL_TYPE_ARRAY':
+        TODO("test me")
+        constant_value = tuple(
+            x['array_elements'][i] for i in xrange(int(ir_type['length'])))
+    elif glsl_base_type == 'GLSL_TYPE_STRUCT':
+        TODO("test me")
+        components = list(iter_exec_list(x['components']))
+        constant_value = tuple(
+            (ir_type['fields']['structure'][i]['name'].string(), components[i])
+            for i in xrange(int(ir_type['length'])))
+    else:
+        num_components = int(ir_type['vector_elements']) \
+            * int(ir_type['matrix_columns'])
+        union_selector = BASE_TYPE_TO_UNION_SELECTOR[glsl_base_type]
+        matrix = x['value'][union_selector]
+        constant_value = tuple(matrix[i] for i in xrange(num_components))
+    return (label(x), 'constant', x['type'], constant_value)
+
+def decode_ir_loop(x):
+    return (
+        label(x), 'loop', (x['counter'] or None,), (x['from'] or None,),
+        (x['to'] or None,), (x['increment'] or None,), NEWLINE,
+        x['body_instructions'])
+
+def decode_ir_if(x):
+    return (
+        label(x), 'if', x['condition'], NEWLINE,
+        x['then_instructions'], NEWLINE,
+        x['else_instructions'])
+
+def decode_ir_loop_jump(x):
+    return shorten(str(x['mode']), 'ir_loop_jump::jump_')
+
+def decode_ir_function(x):
+    return (
+        label(x), 'function', x['name'].string(), NEWLINE,
+        [signature.dereference().cast(gdb.lookup_type('ir_function_signature'))
+         for signature in iter_exec_list(x['signatures'])])
+
+def decode_exec_list(x):
+    for item in iter_exec_list(x):
+        yield downcast_exec_node(item)
+        yield NEWLINE
+
+def compute_offset(master_type, field):
+    """Compute the offest (as an integer number of bytes) of field
+    within master_type."""
+    for f in master_type.fields():
+        if f.name == field:
+            assert f.bitpos % 8 == 0
+            return f.bitpos / 8
+    raise Exception(
+        'Field {0} not found in type {1}'.format(field, master_type))
+
+def field_de_accessor(master_type, field_name):
+    """Return a function that undoes the effects of accesing the
+    field_name'th element of master_type."""
+    def f(x):
+        char_ptr = gdb.lookup_type('char').pointer()
+        master_ptr_type = gdb.lookup_type(master_type).pointer()
+        p_master_type_null = gdb.Value(0).cast(master_ptr_type)
+        offset = long(p_master_type_null.dereference()[field_name].address)
+        return (x.address.cast(char_ptr) - offset).cast(
+            master_ptr_type).dereference()
+    return f
+
+def iter_type_and_bases(typ):
+    # Walk the class hierarchy returning typ and everything it
+    # inherits from
+    types_to_search = [typ]
+    while types_to_search:
+        typ = types_to_search.pop()
+        yield typ
+        for f in typ.fields():
+            if f.is_base_class:
+                types_to_search.append(f.type)
+
+def find_vptr(value):
+    for typ in iter_type_and_bases(value.type):
+        try:
+            type_name = str(typ)
+            return value['_vptr.{0}'.format(type_name)]
+        except:
+            pass
+    return None
+
+def generic_downcast(value):
+    vptr = find_vptr(value)
+    if vptr is None:
+        return value
+    vtable_entry = str(vptr[-1])
+    derived_class_name = TYPEINFO_REGEXP.search(vtable_entry).group(1)
+    derived_class = gdb.lookup_type(derived_class_name)
+    return value.cast(derived_class)
+
+TYPEINFO_REGEXP = re.compile('<typeinfo for (.*)>')
+AST_NODE_LINK_DE_ACCESSOR = None
+EXEC_NODE_DOWNCASTERS = (
+    lambda x: x.cast(gdb.lookup_type('ir_instruction')),
+    field_de_accessor('ast_node', 'link'),
+    )
+
+def downcast_exec_node(x):
+    x = fully_deref(x)
+    for downcaster in EXEC_NODE_DOWNCASTERS:
+        try:
+            return generic_downcast(downcaster(x))
+        except:
+            # If anything went wrong, then presumably the value we
+            # were looking at wasn't of the expected type.  Go on and
+            # try the next one.
+            pass
+    raise Exception("Could not downcast exec_node at {0}".format(x.address))
+
+def decode_ast_declarator_list(x):
+    return (
+        label(x), 'declarator_list', x['type'] or None,
+        'invariant' if x['invariant'] else None, NEWLINE, x['declarations'])
+
+def decode_ast_declaration(x):
+    return (
+        label(x), 'declaration', x['identifier'].string(),
+        '[{0}]'.format(x['array_size']) if x['array_size'] else None,
+        x['initializer'] or None)
+
+def decode_ast_function_definition(x):
+    return (
+        label(x), 'function_definition', x['prototype'], NEWLINE, x['body'])
+
+def decode_ast_function(x):
+    return (
+        label(x), 'function', x['return_type'], x['identifier'].string(),
+        x['parameters'])
+
+def decode_ast_compound_statement(x):
+    return (label(x), 'compound_statement', NEWLINE, x['statements'])
+
+def decode_ast_expression_statement(x):
+    return (
+        label(x), 'expression_statement',
+        x['expression'] if x['expression'] else None)
+
+UNARY_OPS = ('plus', 'neg', 'bit_not', 'logic_not', 'pre_inc', 'pre_dec',
+             'post_inc', 'post_dec')
+
+CONSTANT_TYPES = ('int_constant', 'uint_constant',
+                  'float_constant', 'bool_constant')
+
+def decode_ast_expression(x):
+    yield label(x)
+    op = shorten(str(x['oper']), 'ast_')
+    yield op
+    if op == 'field_selection':
+        TODO("test me")
+        yield x['primary_expression']['identifier'].string()
+    elif op in UNARY_OPS:
+        TODO("test me")
+        yield x['subexpressions'][0]
+    elif op == 'conditional':
+        TODO("test me")
+        yield x['subexpressions'][0]
+        yield x['subexpressions'][1]
+        yield x['subexpressions'][2]
+    elif op == 'function_call':
+        TODO("test me")
+        yield x['subexpressions'][0]
+        yield x['expressions'][0]
+    elif op == 'identifier':
+        yield x['primary_expression']['identifier'].string()
+    elif op in CONSTANT_TYPES:
+        TODO("test me")
+        yield x['primary_expression'][op]
+    elif op == 'sequence':
+        TODO("test me")
+        yield x['expressions']
+    else:
+        yield x['subexpressions'][0]
+        yield x['subexpressions'][1]
+
+def decode_ast_type_qualifier(x):
+    q = x['flags']['q']
+    def do_words(*words):
+        for word in words:
+            if q[word]: yield word
+    if q['constant']: yield 'const'
+    do_words('invariant', 'attribute', 'varying')
+    if q['in'] and q['out']:
+        yield 'inout'
+    else:
+        do_words('in', 'out')
+    do_words('centroid', 'uniform', 'smooth', 'flat', 'noperspective')
+
+def decode_ast_type_specifier(x):
+    if str(x['type_specifier']) == 'ast_struct':
+        TODO("test me")
+        return x['structure']
+    else:
+        return x['type_name'].string()
+
+def decode_ast_fully_specified_type(x):
+    return (label(x), 'type', x['qualifier'], x['specifier'])
