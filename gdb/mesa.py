@@ -190,11 +190,11 @@ class ReadHistory(gdb.Function):
             raise Exception("Need an int")
         return self._history.get(int(i))
 
-class DumpCmd(gdb.Command):
-    def __init__(self, label):
-        self._history = History(label)
+class ViewCmd(gdb.Command):
+    def __init__(self):
+        self._history = History('v')
         ReadHistory(self._history)
-        gdb.Command.__init__(self, "dump_%s" % label,
+        gdb.Command.__init__(self, "view",
                              gdb.COMMAND_DATA, # display in help for data cmds
                              gdb.COMPLETE_SYMBOL # autocomplete with symbols
                              )
@@ -209,8 +209,7 @@ class DumpCmd(gdb.Command):
             s += '\n'
         gdb.write(s)
 
-DumpCmd('ir')
-DumpCmd('ast')
+ViewCmd()
 
 
 def decode(x):
