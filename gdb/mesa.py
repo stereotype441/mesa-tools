@@ -39,63 +39,6 @@ def fully_deref(value):
         value = value.dereference()
     return value
 
-
-
-# Pretty printing: general code
-
-class PrinterBase(object):
-    """Base class for dealing with printers.
-
-    A printer is a function that takes a gdb.Value and returns an
-    output representation of it (which it forms by calling methods on
-    an output factory).
-
-    This class defines some low-level printers and combinators for
-    creating them."""
-
-    def __init__(self, output_factory, history = None):
-        self._output_factory = output_factory
-        self._history = history
-
-    def label(self, context):
-        """Printer that creates a label of the form "$ir(999):", so
-        the user may refer back to this context later."""
-        addr = context.address
-        if addr and self._history:
-            return self._output_factory.atom(
-                "$%s(%s):" % (self._history.label, self._history.add(addr)))
-        else:
-            return self._output_factory.none()
-
-    def printer(self, decoding_fn):
-        """Create a printer based on a decoding function."""
-        def traverse(sexp):
-            while isinstance(sexp, gdb.Value):
-                try:
-                    sexp = decode(sexp)
-                except Exception, e:
-                    accumulator = self._output_factory.open()
-                    self._output_factory.extend(accumulator, self.label(sexp))
-                    self._output_factory.extend(
-                        accumulator,
-                        self._output_factory.error(sys.exc_info(), e))
-                    return self._output_factory.close(accumulator)
-            if isinstance(sexp, basestring):
-                return self._output_factory.atom(sexp)
-            if isinstance(sexp, label):
-                return self.label(sexp.value)
-            if sexp is None:
-                return self._output_factory.none()
-            if isinstance(sexp, newline):
-                return self._output_factory.newline()
-            if isinstance(sexp, collections.Iterable):
-                accumulator = self._output_factory.open()
-                for item in sexp:
-                    self._output_factory.extend(accumulator, traverse(item))
-                return self._output_factory.close(accumulator)
-            TODO(sexp)
-        return lambda context: traverse(decoding_fn(context))
-
 def iter_exec_list(exec_list):
     p = exec_list['head'] # exec_node *
     while p.dereference()['next'] != 0:
@@ -107,14 +50,9 @@ def iter_exec_list(exec_list):
 # History (used to output labels)
 
 class History(object):
-    def __init__(self, label):
+    def __init__(self):
         self._values = []
         self._reverse = {}
-        self._label = label
-
-    @property
-    def label(self):
-        return self._label
 
     def add(self, addr):
         key = (str(addr.type), str(addr))
@@ -126,90 +64,80 @@ class History(object):
     def get(self, index):
         return self._values[index]
 
+VIEW_HISTORY = History()
 
 
-# Output factory for generating a simple sexp view.
-class SimpleOutputFactory(object):
-    def error(self, exc_info, s):
-        traceback.print_exception(*exc_info) # TODO: make optional
-        return ["...%s..." % s]
 
-    def concat(self, values):
-        result = []
-        for value in values:
-            result.extend(value)
-        return result
+# Pretty printer for sexps and (gdb.Value)s.
 
-    def open(self):
-        return []
-
-    def extend(self, items, item):
-        items.extend(item)
-
-    def close(self, items):
-        return [items]
-
-    def atom(self, s):
-        return [s]
-
-    def newline(self):
-        return [None]
-
-    def none(self):
-        return []
-
-    def pretty_print(self, items, prefix = ''):
-        results = []
-        space_needed = False
-        for item in items:
-            if item is None:
-                results.append('\n' + prefix)
-                space_needed = False
-            else:
-                if space_needed:
-                    results.append(' ')
-                if isinstance(item, list):
-                    results.append(
-                        '(%s)' % self.pretty_print(item, prefix + ' '))
+def pretty_print(sexp, writer = gdb.write):
+    def traverse(sexp, prefix):
+        while isinstance(sexp, gdb.Value):
+            try:
+                sexp = decode(sexp)
+            except Exception, e:
+                # TODO: print out backtrace at end
+                error_string = '...{0}...'.format(e)
+                if sexp.address != None:
+                    sexp = (label(sexp), error_string)
                 else:
-                    results.append(item)
-                space_needed = True
-        return ''.join(results)
+                    sexp = error_string
+        if isinstance(sexp, basestring):
+            writer(sexp)
+        elif isinstance(sexp, label):
+            if sexp.value.address is None:
+                writer('...No address...')
+            else:
+                writer('$v({0})'.format(VIEW_HISTORY.add(sexp.value.address)))
+        elif isinstance(sexp, collections.Iterable):
+            prefix = prefix + ' '
+            writer('(')
+            try:
+                space_needed = False
+                for item in sexp:
+                    if item is None:
+                        continue
+                    elif isinstance(item, newline):
+                        writer('\n' + prefix)
+                        space_needed = False
+                    else:
+                        if space_needed: writer(' ')
+                        traverse(item, prefix)
+                        space_needed = True
+            finally:
+                gdb.write(')')
+    traverse(sexp, '')
 
 
 
 # User-accessible commands and convenience functions.
 
 class ReadHistory(gdb.Function):
-    def __init__(self, history):
-        gdb.Function.__init__(self, history.label)
-        self._history = history
+    def __init__(self):
+        gdb.Function.__init__(self, 'v')
 
     def invoke(self, i):
         if i.type.code != gdb.TYPE_CODE_INT:
             raise Exception("Need an int")
-        return self._history.get(int(i))
+        return VIEW_HISTORY.get(int(i))
+
+ReadHistory()
+
+
 
 class ViewCmd(gdb.Command):
     def __init__(self):
-        self._history = History('v')
-        ReadHistory(self._history)
         gdb.Command.__init__(self, "view",
                              gdb.COMMAND_DATA, # display in help for data cmds
                              gdb.COMPLETE_SYMBOL # autocomplete with symbols
                              )
 
     def invoke(self, argument, from_tty):
-        value = gdb.parse_and_eval(argument)
-        value = fully_deref(value)
-        factory = SimpleOutputFactory()
-        s = factory.pretty_print(
-                PrinterBase(factory, self._history).printer(decode)(value))
-        if not s.endswith('\n'):
-            s += '\n'
-        gdb.write(s)
+        pretty_print(gdb.parse_and_eval(argument))
+        gdb.write('\n')
 
 ViewCmd()
+
 
 
 def decode(x):
