@@ -599,7 +599,7 @@ class AstPrinter(PrinterBase):
                 self._output_factory.atom(
                     context['primary_expression']['identifier'].string()))
         elif op in self.constant_types:
-            resulp.append(
+            result.append(
                 self._output_factory.atom(
                     str(context['primary_expression'][self.constant_types[op]])))
         elif op == 'ast_sequence':
