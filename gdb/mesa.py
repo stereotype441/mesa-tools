@@ -30,7 +30,6 @@ class ViewCmd(gdb.Command):
 
     def invoke(self, argument, from_tty):
         pretty_print(gdb.parse_and_eval(argument))
-        gdb.write('\n')
 
 ViewCmd()
 
@@ -91,12 +90,13 @@ def fully_deref(value):
     return value
 
 def pretty_print(sexp, writer = gdb.write):
+    exceptions = []
     def traverse(sexp, prefix):
         while isinstance(sexp, gdb.Value):
             try:
                 sexp = decode(sexp)
             except Exception, e:
-                # TODO: print out backtrace at end
+                exceptions.append(sys.exc_info())
                 error_string = '...{0}...'.format(e)
                 if sexp.address != None:
                     sexp = (label(sexp), error_string)
@@ -125,12 +125,17 @@ def pretty_print(sexp, writer = gdb.write):
                         traverse(item, prefix)
                         space_needed = True
             except Exception, e:
-                # TODO: print out backtrace at end
+                exceptions.append(sys.exc_info())
                 if space_needed: writer(' ')
                 writer('...{0}...'.format(e))
             finally:
                 gdb.write(')')
     traverse(sexp, '')
+    writer('\n')
+    if exceptions:
+        writer('First exception:\n')
+        for line in traceback.format_exception(*exceptions[0]):
+            writer(line)
 
 def decode(x):
     typ = x.type
