@@ -434,7 +434,6 @@ def decode_ast_expression(x):
     elif op == 'identifier':
         yield x['primary_expression']['identifier'].string()
     elif op in CONSTANT_TYPES:
-        TODO("test me")
         yield x['primary_expression'][op]
     elif op == 'sequence':
         TODO("test me")
