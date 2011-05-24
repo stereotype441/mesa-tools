@@ -124,6 +124,10 @@ def pretty_print(sexp, writer = gdb.write):
                         if space_needed: writer(' ')
                         traverse(item, prefix)
                         space_needed = True
+            except Exception, e:
+                # TODO: print out backtrace at end
+                if space_needed: writer(' ')
+                writer('...{0}...'.format(e))
             finally:
                 gdb.write(')')
     traverse(sexp, '')
