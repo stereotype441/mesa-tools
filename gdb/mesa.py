@@ -35,6 +35,41 @@ ViewCmd()
 
 
 
+class DecodingPrettyPrinter(object):
+    def __init__(self, value, ptr):
+        self.value = value
+        self.ptr = ptr
+
+    def to_string(self):
+        return '({0}) 0x{1:x} {2}'.format(
+            self.ptr.type, long(self.ptr), pretty_print_short(self.value))
+
+def decoder_lookup_function(value):
+    try:
+        if value.type.code != gdb.TYPE_CODE_PTR:
+            return None
+        x = value.dereference()
+        if x.type.code == gdb.TYPE_CODE_PTR:
+            return None
+        x = generic_downcast(x)
+        tag = x.type.tag
+        if tag:
+            decoder_name = 'decode_{0}'.format(tag)
+            if decoder_name in globals():
+                return DecodingPrettyPrinter(x, value)
+    except:
+        pass
+    return None
+
+# Note: we register a lambda instead of registering
+# decoder_lookup_function so that if we are reloaded and
+# decoder_lookup_function has changed, the new function will be used.
+if 'DECODER_LOOKUP_FUNCTION_REGISTERED' not in globals():
+    gdb.pretty_printers.append(lambda x: decoder_lookup_function(x))
+    DECODER_LOOKUP_FUNCTION_REGISTERED = True
+
+
+
 # ------------------------
 # Generic helper functions
 # ------------------------
@@ -89,26 +124,34 @@ def fully_deref(value):
         value = value.dereference()
     return value
 
+def eval_for_pretty_print(sexp, exceptions = None):
+    while isinstance(sexp, gdb.Value):
+        try:
+            sexp = decode(sexp)
+        except Exception, e:
+            if exceptions is not None:
+                exceptions.append(sys.exc_info())
+            error_string = '...{0}...'.format(e)
+            if sexp.address != None:
+                sexp = (label(sexp), error_string)
+            else:
+                sexp = error_string
+    return sexp
+
+def format_label(value):
+    if value.address is None:
+        return '...No address...'
+    else:
+        return '$v({0})'.format(VIEW_HISTORY.add(value.address))
+
 def pretty_print(sexp, writer = gdb.write):
     exceptions = []
     def traverse(sexp, prefix):
-        while isinstance(sexp, gdb.Value):
-            try:
-                sexp = decode(sexp)
-            except Exception, e:
-                exceptions.append(sys.exc_info())
-                error_string = '...{0}...'.format(e)
-                if sexp.address != None:
-                    sexp = (label(sexp), error_string)
-                else:
-                    sexp = error_string
+        sexp = eval_for_pretty_print(sexp, exceptions)
         if isinstance(sexp, basestring):
             writer(sexp)
         elif isinstance(sexp, label):
-            if sexp.value.address is None:
-                writer('...No address...')
-            else:
-                writer('$v({0})'.format(VIEW_HISTORY.add(sexp.value.address)))
+            writer('{0}:'.format(format_label(sexp.value)))
         elif isinstance(sexp, collections.Iterable):
             prefix = prefix + ' '
             writer('(')
@@ -137,11 +180,42 @@ def pretty_print(sexp, writer = gdb.write):
         for line in traceback.format_exception(*exceptions[0]):
             writer(line)
 
+def pretty_print_short(sexp):
+    sexp = eval_for_pretty_print(sexp)
+    if isinstance(sexp, basestring):
+        return sexp
+    elif isinstance(sexp, collections.Iterable):
+        elements = []
+        try:
+            for item in sexp:
+                if item is None:
+                    continue
+                elif isinstance(item, newline):
+                    continue
+                elif isinstance(item, label):
+                    continue
+                elif isinstance(item, gdb.Value):
+                    x = fully_deref(item)
+                    if is_char_ptr(item.type) or \
+                            x.type.code != gdb.TYPE_CODE_STRUCT:
+                        elements.append(str(item))
+                    else:
+                        elements.append(format_label(x))
+                else:
+                    elements.append(pretty_print_short(item))
+        except Exception, e:
+            elements.append('...{0}...'.format(e))
+        return '({0})'.format(' '.join(elements))
+    else:
+        TODO(sexp)
+
+def is_char_ptr(typ):
+    return typ.code == gdb.TYPE_CODE_PTR and \
+        typ.target().code == gdb.TYPE_CODE_INT and \
+        typ.target().sizeof == 1
+
 def decode(x):
-    typ = x.type
-    if typ.code == gdb.TYPE_CODE_PTR and \
-            typ.target().code == gdb.TYPE_CODE_INT and \
-            typ.target().sizeof == 1: # char *
+    if is_char_ptr(x.type):
         return str(x)
     x = generic_downcast(fully_deref(x))
     tag = x.type.tag
