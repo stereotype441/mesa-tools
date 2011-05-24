@@ -4,10 +4,61 @@ import re
 import collections
 
 
-# Helper functions
+# --------------------------------------------------
+# User-accessible commands and convenience functions.
+# --------------------------------------------------
+
+class ReadHistory(gdb.Function):
+    def __init__(self):
+        gdb.Function.__init__(self, 'v')
+
+    def invoke(self, i):
+        if i.type.code != gdb.TYPE_CODE_INT:
+            raise Exception("Need an int")
+        return VIEW_HISTORY.get(int(i))
+
+ReadHistory()
+
+
+
+class ViewCmd(gdb.Command):
+    def __init__(self):
+        gdb.Command.__init__(self, "view",
+                             gdb.COMMAND_DATA, # display in help for data cmds
+                             gdb.COMPLETE_SYMBOL # autocomplete with symbols
+                             )
+
+    def invoke(self, argument, from_tty):
+        pretty_print(gdb.parse_and_eval(argument))
+        gdb.write('\n')
+
+ViewCmd()
+
+
+
+# ------------------------
+# Generic helper functions
+# ------------------------
 
 def TODO(*detail):
     raise Exception("TODO({0})".format(', '.join(repr(s) for s in detail)))
+
+class History(object):
+    def __init__(self):
+        self._values = []
+        self._reverse = {}
+
+    def add(self, addr):
+        key = (str(addr.type), str(addr))
+        if key not in self._reverse:
+            self._reverse[key] = len(self._values)
+            self._values.append(addr)
+        return self._reverse[key]
+
+    def get(self, index):
+        return self._values[index]
+
+VIEW_HISTORY = History()
 
 class label(object):
     def __init__(self, value):
@@ -38,37 +89,6 @@ def fully_deref(value):
     while value.type.code == gdb.TYPE_CODE_PTR:
         value = value.dereference()
     return value
-
-def iter_exec_list(exec_list):
-    p = exec_list['head'] # exec_node *
-    while p.dereference()['next'] != 0:
-        yield p
-        p = p.dereference()['next']
-
-
-
-# History (used to output labels)
-
-class History(object):
-    def __init__(self):
-        self._values = []
-        self._reverse = {}
-
-    def add(self, addr):
-        key = (str(addr.type), str(addr))
-        if key not in self._reverse:
-            self._reverse[key] = len(self._values)
-            self._values.append(addr)
-        return self._reverse[key]
-
-    def get(self, index):
-        return self._values[index]
-
-VIEW_HISTORY = History()
-
-
-
-# Pretty printer for sexps and (gdb.Value)s.
 
 def pretty_print(sexp, writer = gdb.write):
     def traverse(sexp, prefix):
@@ -108,38 +128,6 @@ def pretty_print(sexp, writer = gdb.write):
                 gdb.write(')')
     traverse(sexp, '')
 
-
-
-# User-accessible commands and convenience functions.
-
-class ReadHistory(gdb.Function):
-    def __init__(self):
-        gdb.Function.__init__(self, 'v')
-
-    def invoke(self, i):
-        if i.type.code != gdb.TYPE_CODE_INT:
-            raise Exception("Need an int")
-        return VIEW_HISTORY.get(int(i))
-
-ReadHistory()
-
-
-
-class ViewCmd(gdb.Command):
-    def __init__(self):
-        gdb.Command.__init__(self, "view",
-                             gdb.COMMAND_DATA, # display in help for data cmds
-                             gdb.COMPLETE_SYMBOL # autocomplete with symbols
-                             )
-
-    def invoke(self, argument, from_tty):
-        pretty_print(gdb.parse_and_eval(argument))
-        gdb.write('\n')
-
-ViewCmd()
-
-
-
 def decode(x):
     typ = x.type
     if typ.code == gdb.TYPE_CODE_PTR and \
@@ -155,6 +143,72 @@ def decode(x):
     if x.type.code == gdb.TYPE_CODE_STRUCT:
         return (label(x), str(x))
     return str(x)
+
+def compute_offset(master_type, field):
+    """Compute the offest (as an integer number of bytes) of field
+    within master_type."""
+    for f in master_type.fields():
+        if f.name == field:
+            assert f.bitpos % 8 == 0
+            return f.bitpos / 8
+    raise Exception(
+        'Field {0} not found in type {1}'.format(field, master_type))
+
+def field_de_accessor(master_type, field_name):
+    """Return a function that undoes the effects of accesing the
+    field_name'th element of master_type."""
+    def f(x):
+        char_ptr = gdb.lookup_type('char').pointer()
+        master_ptr_type = gdb.lookup_type(master_type).pointer()
+        p_master_type_null = gdb.Value(0).cast(master_ptr_type)
+        offset = long(p_master_type_null.dereference()[field_name].address)
+        return (x.address.cast(char_ptr) - offset).cast(
+            master_ptr_type).dereference()
+    return f
+
+def iter_type_and_bases(typ):
+    # Walk the class hierarchy returning typ and everything it
+    # inherits from
+    types_to_search = [typ]
+    while types_to_search:
+        typ = types_to_search.pop()
+        yield typ
+        for f in typ.fields():
+            if f.is_base_class:
+                types_to_search.append(f.type)
+
+def find_vptr(value):
+    for typ in iter_type_and_bases(value.type):
+        try:
+            type_name = str(typ)
+            return value['_vptr.{0}'.format(type_name)]
+        except:
+            pass
+    return None
+
+def generic_downcast(value):
+    vptr = find_vptr(value)
+    if vptr is None:
+        return value
+    vtable_entry = str(vptr[-1])
+    derived_class_name = TYPEINFO_REGEXP.search(vtable_entry).group(1)
+    derived_class = gdb.lookup_type(derived_class_name)
+    return value.cast(derived_class)
+
+
+
+# ----------------------
+# MESA-specific decoders
+# ----------------------
+#
+# Note: any function whose name is of the form decode_<typename> will
+# automatically be called to decode values of that type.
+
+def iter_exec_list(exec_list):
+    p = exec_list['head'] # exec_node *
+    while p.dereference()['next'] != 0:
+        yield p
+        p = p.dereference()['next']
 
 def decode_glsl_type(x):
     if str(x['base_type']) == 'GLSL_TYPE_ARRAY':
@@ -295,57 +349,6 @@ def decode_exec_list(x):
     for item in iter_exec_list(x):
         yield downcast_exec_node(item)
         yield NEWLINE
-
-def compute_offset(master_type, field):
-    """Compute the offest (as an integer number of bytes) of field
-    within master_type."""
-    for f in master_type.fields():
-        if f.name == field:
-            assert f.bitpos % 8 == 0
-            return f.bitpos / 8
-    raise Exception(
-        'Field {0} not found in type {1}'.format(field, master_type))
-
-def field_de_accessor(master_type, field_name):
-    """Return a function that undoes the effects of accesing the
-    field_name'th element of master_type."""
-    def f(x):
-        char_ptr = gdb.lookup_type('char').pointer()
-        master_ptr_type = gdb.lookup_type(master_type).pointer()
-        p_master_type_null = gdb.Value(0).cast(master_ptr_type)
-        offset = long(p_master_type_null.dereference()[field_name].address)
-        return (x.address.cast(char_ptr) - offset).cast(
-            master_ptr_type).dereference()
-    return f
-
-def iter_type_and_bases(typ):
-    # Walk the class hierarchy returning typ and everything it
-    # inherits from
-    types_to_search = [typ]
-    while types_to_search:
-        typ = types_to_search.pop()
-        yield typ
-        for f in typ.fields():
-            if f.is_base_class:
-                types_to_search.append(f.type)
-
-def find_vptr(value):
-    for typ in iter_type_and_bases(value.type):
-        try:
-            type_name = str(typ)
-            return value['_vptr.{0}'.format(type_name)]
-        except:
-            pass
-    return None
-
-def generic_downcast(value):
-    vptr = find_vptr(value)
-    if vptr is None:
-        return value
-    vtable_entry = str(vptr[-1])
-    derived_class_name = TYPEINFO_REGEXP.search(vtable_entry).group(1)
-    derived_class = gdb.lookup_type(derived_class_name)
-    return value.cast(derived_class)
 
 TYPEINFO_REGEXP = re.compile('<typeinfo for (.*)>')
 AST_NODE_LINK_DE_ACCESSOR = None
