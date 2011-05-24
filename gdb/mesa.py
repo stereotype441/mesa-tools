@@ -83,7 +83,7 @@ class History(object):
         self._reverse = {}
 
     def add(self, addr):
-        key = (str(addr.type), str(addr))
+        key = (str(addr.type), long(addr))
         if key not in self._reverse:
             self._reverse[key] = len(self._values)
             self._values.append(addr)
