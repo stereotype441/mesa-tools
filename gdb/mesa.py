@@ -435,6 +435,12 @@ def decode_ir_function(x):
         [signature.dereference().cast(gdb.lookup_type('ir_function_signature'))
          for signature in iter_exec_list(x['signatures'])])
 
+def decode_ir_call(x):
+    yield label(x)
+    yield 'call'
+    yield x['callee']['_function']['name'].string()
+    yield x['actual_parameters']
+
 def decode_exec_list(x):
     for item in iter_exec_list(x):
         yield downcast_exec_node(item)
