@@ -317,14 +317,19 @@ def decode_ir_variable(x):
         x['type'], x['name'])
 
 def decode_ir_function_signature(x):
-    param_list = ['parameters', NEWLINE]
-    for param in iter_exec_list(x['parameters']):
-        param_list.extend(
-            [x.dereference().cast(gdb.lookup_type('ir_variable')), NEWLINE])
-    return (
-        label(x), 'signature', x['return_type'], NEWLINE,
-        param_list, NEWLINE,
-        x['body'])
+    def decode_param_list(params):
+        yield 'parameters'
+        yield NEWLINE
+        for param in iter_exec_list(params):
+            yield x.dereference().cast(gdb.lookup_type('ir_variable'))
+            yield NEWLINE
+    yield label(x)
+    yield 'signature'
+    yield x['return_type']
+    yield NEWLINE
+    yield decode_param_list(x['parameters'])
+    yield NEWLINE
+    yield x['body']
 
 def decode_ir_assignment(x):
     write_mask = int(x['write_mask'])
