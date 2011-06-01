@@ -41,6 +41,8 @@ class DecodingPrettyPrinter(object):
         self.ptr = ptr
 
     def to_string(self):
+        if long(self.ptr) == 0:
+            return '({0}) 0x{1:x}'.format(self.ptr.type, 0)
         return '({0}) 0x{1:x} {2}'.format(
             self.ptr.type, long(self.ptr), pretty_print_short(self.value))
 
