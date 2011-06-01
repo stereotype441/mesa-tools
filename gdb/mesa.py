@@ -440,6 +440,9 @@ def decode_exec_list(x):
         yield downcast_exec_node(item)
         yield NEWLINE
 
+def decode_exec_node(x):
+    return downcast_exec_node(x)
+
 TYPEINFO_REGEXP = re.compile('<typeinfo for (.*)>')
 AST_NODE_LINK_DE_ACCESSOR = None
 EXEC_NODE_DOWNCASTERS = (
@@ -457,7 +460,8 @@ def downcast_exec_node(x):
             # were looking at wasn't of the expected type.  Go on and
             # try the next one.
             pass
-    raise Exception("Could not downcast exec_node at {0}".format(x.address))
+    raise Exception(
+        "Could not downcast exec_node at 0x{0:x}".format(long(x.address)))
 
 def decode_ast_declarator_list(x):
     return (
