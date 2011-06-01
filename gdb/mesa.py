@@ -321,7 +321,7 @@ def decode_ir_function_signature(x):
         yield 'parameters'
         yield NEWLINE
         for param in iter_exec_list(params):
-            yield x.dereference().cast(gdb.lookup_type('ir_variable'))
+            yield param
             yield NEWLINE
     yield label(x)
     yield 'signature'
