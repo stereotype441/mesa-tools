@@ -1,0 +1,135 @@
+#!/bin/bash
+exec_short_name=`basename "$0"`
+
+usage()
+{
+    echo "Usage:"
+    echo "  $exec_short_name use <env>: start bash in environment <env>"
+    echo "  $exec_short_name initcmds: output commands to init environment"
+    echo "  $exec_short_name using <env> <cmd>: run command in <env>"
+    echo "  $exec_short_name configure <project>: configure project"
+    echo "  $exec_short_name build <project>: build project"
+    echo "  $exec_short_name install <project>: install project"
+    echo
+    echo "Available projects:"
+    echo "  mesa"
+    exit 1
+}
+
+check_env()
+{
+    if [[ "$TEPUI_ENV" == "" ]]; then
+        echo "No environment set"
+        exit 1
+    fi
+}
+
+setup_env()
+{
+    export TEPUI_ENV="$1"
+    export TEPUI_ROOT_DIR="$HOME/.tepui/envs/$TEPUI_ENV"
+    mkdir -p "$TEPUI_ROOT_DIR"
+    export TEPUI_INSTALL_DIR="$TEPUI_ROOT_DIR/install"
+    export CPATH="$TEPUI_INSTALL_DIR/include:$CPATH"
+    export LD_LIBRARY_PATH="$TEPUI_INSTALL_DIR/lib:$LD_LIBRARY_PATH"
+    export LIBGL_DRIVERS_PATH="$TEPUI_INSTALL_DIR/lib/dri:$LIBGL_DRIVERS_PATH"
+    export LIBRARY_PATH="$TEPUI_INSTALL_DIR/lib:$LIBRARY_PATH"
+    export PATH="$TEPUI_INSTALL_DIR/bin:$PATH"
+    export PIGLIT_BUILD_DIR="$TEPUI_ROOT_DIR/build/piglit"
+    export PKG_CONFIG_PATH="$TEPUI_INSTALL_DIR/lib/pkgconfig:$TEPUI_INSTALL_DIR/share/pkgconfig:$PKG_CONFIG_PATH"
+}
+
+exec_project()
+{
+    mode="$1"
+    project="$2"
+    if [[ "$project" != "mesa" ]]; then
+        echo "The only supported project is 'mesa'"
+        exit 1
+    fi
+    mkdir -p "$TEPUI_ROOT_DIR/source"
+    source_dir="$TEPUI_ROOT_DIR/source/mesa"
+    if [ ! -e "$source_dir" ]; then
+        ln -s ~/mesa "$source_dir"
+    fi
+    build_dir="$TEPUI_ROOT_DIR/build/mesa"
+    if [[ "$mode" == "configure" ]]; then
+        if [ -d "$build_dir" ]; then
+            rm -r "$build_dir" || exit 1
+        fi
+    fi
+    mkdir -p "$build_dir" || exit 1
+    cd "$build_dir" || exit 1
+    lndir "$source_dir" || exit 1
+    case "$mode" in
+        "configure")
+            ./autogen.sh \
+                --disable-gallium \
+                --disable-gles1 \
+                --disable-glut \
+                --enable-debug \
+                --enable-egl \
+                --enable-egl \
+                --enable-gles2 \
+                --enable-selinux \
+                --enable-texture-float \
+                --prefix=$TEPUI_INSTALL_DIR \
+                --with-dri-drivers=swrast,i915,i965 \
+                CFLAGS="-O0 $CFLAGS" \
+                CXXFLAGS="-O0 $CXXFLAGS"
+            ;;
+        "build")
+            num_jobs=`getconf _NPROCESSORS_ONLN`
+            make "-j$num_jobs"
+            ;;
+        "install")
+            make install
+            ;;
+    esac
+}
+
+if (( $# == 0 )); then
+    usage
+fi
+
+case "$1" in
+    "use")
+        if (( $# != 2 )); then
+            echo "Usage: $exec_short_name use <env>"
+            exit 1
+        fi
+        setup_env "$2"
+        bash
+        ;;
+    "initcmds")
+        if (( $# != 1 )); then
+            echo "Usage: $exec_short_name initcmds"
+            exit 1
+        fi
+        if [[ "$TEPUI_ENV" != "" ]]; then
+            cat <<EOF
+PS1="[$TEPUI_ENV] \$PS1"
+EOF
+        fi
+        ;;
+    "using")
+        if (( $# < 3 )); then
+            echo "Usage $exec_short_name using <env> <cmd>"
+            exit 1
+        fi
+        setup_env "$2"
+        shift 2
+        "$@"
+        ;;
+    "configure" | "build" | "install")
+        if (( $# != 2 )); then
+            echo "Usage: $exec_short_name configure <project>"
+            exit 1
+        fi
+        check_env
+        exec_project "$1" "$2"
+        ;;
+    *)
+        usage
+        ;;
+esac
