@@ -10,6 +10,7 @@ usage()
     echo "  $exec_short_name configure <project>: configure project"
     echo "  $exec_short_name build <project>: build project"
     echo "  $exec_short_name install <project>: install project"
+    echo "  $exec_short_name test <project>: run tests for project"
     echo
     echo "Available projects:"
     echo "  mesa piglit"
@@ -119,6 +120,21 @@ exec_project()
     esac
 }
 
+test_project()
+{
+    project="$1"
+    case "$project" in
+        "piglit")
+            ;;
+        *)
+            echo "Unsupported project: $project"
+            exit 1
+            ;;
+    esac
+    cd ~/piglit-run
+    bin/run
+}
+
 if (( $# == 0 )); then
     usage
 fi
@@ -159,6 +175,9 @@ EOF
         fi
         check_env
         exec_project "$1" "$2"
+        ;;
+    "test")
+        test_project "$2"
         ;;
     *)
         usage
