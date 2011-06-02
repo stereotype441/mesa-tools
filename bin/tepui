@@ -146,7 +146,7 @@ case "$1" in
             exit 1
         fi
         setup_env "$2"
-        bash
+        exec bash
         ;;
     "initcmds")
         if (( $# != 1 )); then
