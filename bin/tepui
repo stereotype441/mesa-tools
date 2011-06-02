@@ -126,14 +126,18 @@ test_project()
     project="$1"
     case "$project" in
         "piglit")
+            cd ~/piglit-run
+            bin/run
+            ;;
+        "mesa")
+            cd ~/mesa-tests-paul
+            python test.py
             ;;
         *)
             echo "Unsupported project: $project"
             exit 1
             ;;
     esac
-    cd ~/piglit-run
-    bin/run
 }
 
 if (( $# == 0 )); then
