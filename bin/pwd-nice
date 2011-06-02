@@ -1,0 +1,32 @@
+#!/usr/bin/python
+
+# Like pwd, but uses abbreviations from the environment.
+# example:
+#   > export FOO=$HOME/projects/foo
+#   > cd $HOME/projects/foo/bar
+#   > pwd-nice
+#   $FOO/bar
+
+import os
+
+working_dir = os.getcwd()
+shortenings = [('', working_dir)]
+
+def try_shortening(literal, abbrev):
+    if working_dir == literal or working_dir.startswith(literal + '/'):
+        shortenings.append((abbrev, working_dir[len(literal):]))
+
+try_shortening(os.path.expanduser('~'), '~')
+for key, value in os.environ.items():
+    if key in ('PWD', 'OLDPWD'):
+        continue
+    if value.startswith('/') and not value.endswith('/'):
+        try_shortening(value, '$' + key)
+
+def sort_order(shortening):
+    lhs, rhs = shortening
+    return (len(rhs), len(lhs))
+
+shortenings.sort(key=sort_order)
+
+print ''.join(shortenings[0])
