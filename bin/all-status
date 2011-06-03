@@ -2,9 +2,9 @@
 IFS=$'\n'
 DIRS=`find ~ -name '.git'`
 for x in $DIRS; do
-    status="`cd "$x"; cd ..; git status -s`"
+    status="`cd "$x"; cd ..; git status -s -b`"
     if [[ "$status" != "" ]]; then
-        echo "`cd "$x"; cd ..; pwd`:"
+        printf "%-30s " "`cd "$x"; cd ..; pwd-nice`:"
         for line in $status; do
             echo "  $line"
         done
