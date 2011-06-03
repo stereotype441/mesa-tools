@@ -9,7 +9,13 @@
 
 import os
 
-working_dir = os.getcwd()
+try:
+    working_dir = os.getcwd()
+    defunct = False
+except:
+    working_dir = os.environ['PWD']
+    defunct = True
+
 shortenings = [('', working_dir)]
 
 def try_shortening(literal, abbrev):
@@ -29,4 +35,9 @@ def sort_order(shortening):
 
 shortenings.sort(key=sort_order)
 
-print ''.join(shortenings[0])
+result = ''.join(shortenings[0])
+
+if defunct:
+    result += ' (defunct)'
+
+print result
