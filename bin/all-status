@@ -1,0 +1,12 @@
+#!/bin/bash
+IFS=$'\n'
+DIRS=`find ~ -name '.git'`
+for x in $DIRS; do
+    status="`cd "$x"; cd ..; git status -s`"
+    if [[ "$status" != "" ]]; then
+        echo "`cd "$x"; cd ..; pwd`:"
+        for line in $status; do
+            echo "  $line"
+        done
+    fi
+done
