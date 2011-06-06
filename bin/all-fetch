@@ -1,0 +1,11 @@
+#!/bin/bash
+oldifs=$IFS
+IFS=$'\n'
+dirs=(`find ~ -type d -name '.git'`)
+IFS=$oldifs
+for x in "${dirs[@]}"; do
+    echo "`cd "$x"; cd ..; pwd-nice`:"
+    cd "$x"
+    cd ..
+    git fetch --all
+done
