@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+platform checkactive
+build_dir="$PLATFORM_ROOT_DIR/llvm"
+if [ -d "$build_dir" ]; then
+    rm -r "$build_dir"
+fi
+cd "$PLATFORM_ROOT_DIR"
+tar -xvzf "$HOME/Downloads/llvm-2.9.tgz"
+mv llvm-2.9 llvm
+cd llvm
+pushd tools
+tar -xvzf "$HOME/Downloads/clang-2.9.tgz"
+mv clang-2.9 clang
+popd
+./configure \
+    "--prefix=$PLATFORM_INSTALL_DIR" \
+    --disable-optimized \
+    --enable-assertions
