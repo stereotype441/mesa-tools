@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Allow the user to configure and switch between various different
+# "platforms" in which to build and run programs.  A platform is a
+# storage location for build artifacts.  Each platform can be
+# configured to point to parent platforms--environment variables like
+# LD_LIBRARY_PATH are set to point to the build artifacts from the
+# parent platforms.
+#
+# Storage model:
+#
+# - $HOME/.platform
+#   - $PLATFORM_NAME
+#     - parents: list of parent platforms, space-separated and shell-escaped
+#     - install
+#       - include: headers produced by this platform
+#       - lib: libraries produced by this platform
+#         - dri: libgl drivers produced by this platform
+#         - pkgconfig: package configs produced by this platform
+#       - bin: binaries produced by this platform
+#       - share
+#         - pkgconfig: package configs produced by this platform
+#
+# Shell variables modified when a platform is active:
+# - $PLATFORM_NAME (e.g. "mesa")
+# - $PLATFORM_ROOT_DIR (e.g. "~/.platform/mesa")
+# - $PLATFORM_INSTALL_DIR (e.g. "~/.platform/mesa/install")
+# - $PLATFORM_DESC (e.g. "mesa()")
+# - $CPATH ("include" subdir prepended)
+# - $LD_LIBRARY_PATH ("lib" subdir prepended)
+# - $LIBGL_DRIVERS_PATH ("lib/dri" subdir prepended)
+# - $LIBRARY_PATH ("lib" subdir prepended)
+# - $PATH ("bin" subdir prepended)
+# - $PKG_CONFIG_PATH ("pkgconfig" subdirs prepended)
+
+exec_short_name=`basename "$0"`
+
+usage()
+{
+    echo "Usage:"
+    echo "  $exec_short_name create <platform> <parents...>: create new platform"
+    echo "  $exec_short_name delete <platform>: delete platform"
+    echo "  $exec_short_name info <platform>: summarize platform"
+    echo "  $exec_short_name use <platform>: start subshell with platform active"
+    echo "  $exec_short_name list: list all platforms"
+    echo "  $exec_short_name checkactive: succeed if a platform is active"
+    exit 1
+}
+
+if (( $# == 0 )); then
+    usage
+fi
+
+check_platform_present()
+{
+    if [ ! -e "$HOME/.platform/$1" ]; then
+        echo "Platform $1 does not exist"
+        exit 1
+    fi
+}
+
+read_platform()
+{
+    check_platform_present "$1"
+    platform_name="$1"
+    readarray -t parents < "$HOME/.platform/$platform_name/parents"
+}
+
+get_platform_desc()
+{
+    local platform_name="$1"
+    local parents
+    readarray -t parents < "$HOME/.platform/$platform_name/parents"
+    echo "$platform_name(${parents[*]})"
+}
+
+setup_env()
+{
+    export PLATFORM_NAME="$platform_name"
+    export PLATFORM_ROOT_DIR="$HOME/.platform/$PLATFORM_NAME"
+    export PLATFORM_DESC="$platform_name(${parents[*]})"
+    export PLATFORM_INSTALL_DIR="$PLATFORM_ROOT_DIR/install"
+    for parent in "${parents[@]}"; do
+        local install_dir="$HOME/.platform/$parent/install"
+        export CPATH="$install_dir/include:$CPATH"
+        export LD_LIBRARY_PATH="$install_dir/lib:$LD_LIBRARY_PATH"
+        export LIBGL_DRIVERS_PATH="$install_dir/lib/dri:$LIBGL_DRIVERS_PATH"
+        export LIBRARY_PATH="$install_dir/lib:$LIBRARY_PATH"
+        export PATH="$install_dir/bin/$PATH"
+        export PKG_CONFIG_PATH="$install_dir/lib/pkgconfig:$install_dir/share/pkgconfig:$PKG_CONFIG_PATH"
+    done
+}
+
+case "$1" in
+    "create")
+        (( $# >= 2 )) || usage
+        platform_name="$2"
+        shift 2
+        if [ -e "$HOME/.platform/$platform_name" ]; then
+            echo "Platform $platform_name already exists"
+            exit 1
+        fi
+        echo "Creating platform $platform_name"
+        mkdir -p "$HOME/.platform/$platform_name"
+        (for parent in "$@"; do
+            echo "$parent"
+        done) > "$HOME/.platform/$platform_name/parents"
+        ;;
+    "delete")
+        (( $# == 2 )) || usage
+        platform_name="$2"
+        check_platform_present "$platform_name"
+        echo "Deleting platform $platform_name"
+        rm -rf "$HOME/.platform/$platform_name"
+        ;;
+    "info")
+        (( $# == 2 )) || usage
+        platform_name="$2"
+        read_platform "$platform_name"
+        echo "Platform $platform_name:"
+        for parent in "${parents[@]}"; do
+            echo "  Parent: $parent"
+        done
+        ;;
+    "use")
+        (( $# == 2 )) || usage
+        platform_name="$2"
+        read_platform "$platform_name"
+        setup_env
+        exec bash
+        ;;
+    "list")
+        (( $# == 1 )) || usage
+        mkdir -p "$HOME/.platform"
+        oldifs="$IFS"
+        IFS=$'\n'
+        platforms=(`ls "$HOME/.platform"`)
+        IFS="$oldifs"
+        for platform in "${platforms[@]}"; do
+            get_platform_desc "$platform"
+        done
+        ;;
+    "checkactive")
+        (( $# == 1 )) || usage
+        if [[ "$PLATFORM_NAME" == "" ]]; then
+            echo "No platform is active."
+            exit 1
+        fi
+        ;;
+    *)
+        usage
+esac
