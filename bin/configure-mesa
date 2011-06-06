@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+platform checkactive
+build_dir="$PLATFORM_ROOT_DIR/mesa"
+if [ -d "$build_dir" ]; then
+    rm -r "$build_dir"
+fi
+mkdir -p "$build_dir"
+cd "$build_dir"
+lndir "$HOME/mesa"
+./autogen.sh \
+    --disable-gallium \
+    --disable-gles1 \
+    --disable-glut \
+    --enable-debug \
+    --enable-egl \
+    --enable-egl \
+    --enable-gles2 \
+    --enable-selinux \
+    --enable-texture-float \
+    "--prefix=$PLATFORM_INSTALL_DIR" \
+    --with-dri-drivers=swrast,i915,i965 \
+    CFLAGS="-O0 $CFLAGS" \
+    CXXFLAGS="-O0 $CXXFLAGS"
