@@ -5,26 +5,23 @@ exec_short_name=`basename "$0"`
 usage()
 {
     echo "Usage"
-    echo "  $exec_short_name: run tests, archiving by timestamp"
-    echo "  $exec_short_name <note>: run tests, archiving by timestamp and note"
+    echo "  $exec_short_name <name> <opts...>"
     exit 1
 }
 
-(( $# <= 1 )) || usage
+(( $# >= 1 )) || usage
+short_name=$1
+shift 1
 
 set -e
 platform checkactive
 cd "$PLATFORM_ROOT_DIR/piglit"
-mkdir -p run
-cd run
-piglit_run_dir=$PLATFORM_ROOT_DIR/piglit/run
+result_parent_dir=$HOME/piglit-results
 piglit_source_dir=$PLATFORM_ROOT_DIR/piglit/source
 export PIGLIT_BUILD_DIR=$PLATFORM_ROOT_DIR/piglit/build
 timestamp=$(date -u +%Y-%m-%d-%H%M%S)
-result_dir=$PLATFORM_ROOT_DIR/piglit/run/$timestamp
-if (( $# == 1 )); then
-    result_dir=$result_dir-$1
-fi
-mkdir -p $result_dir
-cd $piglit_source_dir
-./piglit-run.py tests/quick.tests "$result_dir"
+long_name=$PLATFORM_NAME-$timestamp-$short_name
+result_dir=$result_parent_dir/$long_name
+mkdir -p "$result_dir"
+cd "$piglit_source_dir"
+./piglit-run.py -n "$long_name" "$@" tests/quick.tests "$result_dir"

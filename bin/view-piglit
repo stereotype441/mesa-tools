@@ -1,0 +1,20 @@
+#!/bin/bash
+
+exec_short_name=`basename "$0"`
+
+usage()
+{
+    echo "Usage"
+    echo "  $exec_short_name"
+    exit 1
+}
+
+(( $# == 0 )) || usage
+
+set -e
+platform checkactive
+results_dir=$HOME/piglit-results
+summary_dir=$HOME/piglit-summary
+cd "$PLATFORM_ROOT_DIR/piglit/source"
+./piglit-summary-html.py --overwrite "$summary_dir" $results_dir/*
+gnome-open "$summary_dir/index.html"
