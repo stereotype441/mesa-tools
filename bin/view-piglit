@@ -15,6 +15,7 @@ set -e
 platform checkactive
 results_dir=$HOME/piglit-results
 summary_dir=$HOME/piglit-summary
+rmdir --ignore-fail-on-non-empty $results_dir/*
 cd "$PLATFORM_ROOT_DIR/piglit/source"
 ./piglit-summary-html.py --overwrite "$summary_dir" $results_dir/*
 gnome-open "$summary_dir/index.html"
