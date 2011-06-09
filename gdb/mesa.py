@@ -441,6 +441,12 @@ def decode_ir_call(x):
     yield x['callee']['_function']['name'].string()
     yield x['actual_parameters']
 
+def decode_ir_dereference_array(x):
+    yield label(x)
+    yield 'array_ref'
+    yield x['array']
+    yield x['array_index']
+
 def decode_exec_list(x):
     for item in iter_exec_list(x):
         yield downcast_exec_node(item)
