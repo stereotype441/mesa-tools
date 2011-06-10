@@ -42,6 +42,7 @@ usage()
     echo "  $exec_short_name delete <platform>: delete platform"
     echo "  $exec_short_name info <platform>: summarize platform"
     echo "  $exec_short_name use <platform>: start subshell with platform active"
+    echo "  $exec_short_name using <platform> <cmd>: run cmd with platform active"
     echo "  $exec_short_name list: list all platforms"
     echo "  $exec_short_name checkactive: succeed if a platform is active"
     exit 1
@@ -128,6 +129,14 @@ case "$1" in
         read_platform "$platform_name"
         setup_env
         exec bash
+        ;;
+    "using")
+        (( $# >= 3 )) || usage
+        platform_name="$2"
+        shift 2
+        read_platform "$platform_name"
+        setup_env
+        exec "$@"
         ;;
     "list")
         (( $# == 1 )) || usage
