@@ -1,4 +1,17 @@
 #!/bin/bash
+
+exec_short_name=`basename "$0"`
+
+usage()
+{
+    echo "Usage"
+    echo "  $exec_short_name <llvm-version>"
+    exit 1
+}
+
+(( $# == 1 )) || usage
+llvm_version=$1
+
 set -e
 platform checkactive
 build_dir="$PLATFORM_ROOT_DIR/llvm"
@@ -6,12 +19,12 @@ if [ -d "$build_dir" ]; then
     rm -r "$build_dir"
 fi
 cd "$PLATFORM_ROOT_DIR"
-tar -xvzf "$HOME/Downloads/llvm-2.9.tgz"
-mv llvm-2.9 llvm
+tar -xvzf "$HOME/Downloads/llvm-$llvm_version.tgz"
+mv "llvm-$llvm_version" llvm
 cd llvm
 pushd tools
-tar -xvzf "$HOME/Downloads/clang-2.9.tgz"
-mv clang-2.9 clang
+tar -xvzf "$HOME/Downloads/clang-$llvm_version.tgz"
+mv "clang-$llvm_version" clang
 popd
 ./configure \
     "--prefix=$PLATFORM_INSTALL_DIR" \
