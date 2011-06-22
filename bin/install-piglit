@@ -1,0 +1,8 @@
+#!/bin/bash
+# Note: it is not necessary to do this to run piglit, but it is
+# helpful for manual testing of piglit tests.
+set -e
+platform checkactive
+mkdir -p "$PLATFORM_ROOT_DIR/install/bin"
+cd "$PLATFORM_ROOT_DIR/install/bin"
+ln -s -f "$PLATFORM_ROOT_DIR/piglit/build/bin"/* .
