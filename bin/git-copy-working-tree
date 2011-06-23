@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [[ $# != 1 ]]; then
+    echo 'Usage; git-copy-working-tree $SOURCE_TREE'
+    exit 1
+fi
+
+set -e
+(cd "$1"; git update-ref refs/heads/__TO_COPY `git-commit-working-tree`)
+git init
+git fetch "$1" __TO_COPY
+rm "$1/.git/refs/heads/__TO_COPY"
+git reset --hard FETCH_HEAD

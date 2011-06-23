@@ -2,8 +2,7 @@
 set -e
 platform checkactive
 cd "$PLATFORM_ROOT_DIR/mesa"
-git fetch "$HOME/mesa" HEAD
-git reset --hard FETCH_HEAD
+git-copy-working-tree "$HOME/mesa"
 git tag -d build || true
 num_jobs=`getconf _NPROCESSORS_ONLN`
 make "-j$num_jobs"

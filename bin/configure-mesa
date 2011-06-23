@@ -2,14 +2,10 @@
 set -e
 platform checkactive
 build_dir="$PLATFORM_ROOT_DIR/mesa"
-if [ -d "$build_dir" ]; then
-    rm -rf "$build_dir"
-fi
 mkdir -p "$build_dir"
 cd "$build_dir"
-git init
-git fetch "$HOME/mesa" HEAD
-git reset --hard FETCH_HEAD
+git-copy-working-tree "$HOME/mesa"
+git clean -f -x
 ./autogen.sh \
     --disable-gallium \
     --disable-gles1 \

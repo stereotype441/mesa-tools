@@ -1,0 +1,18 @@
+#!/bin/bash
+
+if [[ $# != 0 ]]; then
+    echo "Usage: git-commit-working-tree"
+    exit 1
+fi
+
+set -e
+export GIT_INDEX_FILE=`mktemp`
+git read-tree HEAD # Creates index based on HEAD.
+git add -A
+NEW_TREE=`git write-tree`
+if git diff --quiet HEAD $NEW_TREE; then
+    # No differences
+    git rev-parse HEAD
+else
+    (echo "Work in progress"; echo; git diff --stat HEAD $NEW_TREE)  | git commit-tree $NEW_TREE -p HEAD
+fi

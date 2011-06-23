@@ -2,16 +2,13 @@
 set -e
 platform checkactive
 build_dir="$PLATFORM_ROOT_DIR/piglit"
-if [ -d "$build_dir" ]; then
-    rm -rf "$build_dir"
-fi
 mkdir -p "$build_dir"
 cd "$build_dir"
+rm -rf build
 mkdir -p source
 pushd source
-git init
-git fetch "$HOME/piglit" HEAD
-git reset --hard FETCH_HEAD
+git-copy-working-tree "$HOME/piglit"
+git clean -f -x
 popd
 mkdir -p build
 cd build
