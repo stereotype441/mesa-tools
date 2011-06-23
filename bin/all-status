@@ -1,6 +1,6 @@
 #!/bin/bash
 IFS=$'\n'
-DIRS=`find ~ -type d -name '.git'`
+DIRS=`find ~ -type d -name '.platform' -prune -o -name '.git' -print`
 for x in $DIRS; do
     status="`cd "$x"; cd ..; git status -s -b`"
     if [[ "$status" != "" ]]; then

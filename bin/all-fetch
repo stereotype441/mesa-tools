@@ -1,7 +1,7 @@
 #!/bin/bash
 oldifs=$IFS
 IFS=$'\n'
-dirs=(`find ~ -type d -name '.git'`)
+dirs=(`find ~ -type d -name '.platform' -prune -o -name '.git' -print`)
 IFS=$oldifs
 for x in "${dirs[@]}"; do
     echo "`cd "$x"; cd ..; pwd-nice`:"
