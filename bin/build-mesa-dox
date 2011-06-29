@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd "$PLATFORM_ROOT_DIR/mesa"
+git-copy-working-tree "$HOME/mesa"
+cd doxygen
+make

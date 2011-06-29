@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+platform checkactive
+gnome-open "$PLATFORM_ROOT_DIR/mesa/doxygen/main/index.html"
