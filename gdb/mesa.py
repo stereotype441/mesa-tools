@@ -447,6 +447,12 @@ def decode_ir_dereference_array(x):
     yield x['array']
     yield x['array_index']
 
+def decode_ir_return(x):
+    yield label(x)
+    yield 'return'
+    if x['value']:
+        yield x['value']
+
 def decode_exec_list(x):
     for item in iter_exec_list(x):
         yield downcast_exec_node(item)
@@ -561,3 +567,14 @@ def decode_ast_type_specifier(x):
 
 def decode_ast_fully_specified_type(x):
     return (label(x), 'type', x['qualifier'], x['specifier'])
+
+def decode_s_list(x):
+    yield label(x)
+    for item in iter_exec_list(x['subexpressions']):
+        yield downcast_exec_node(item)
+
+def decode_s_symbol(x):
+    return x['str'].string()
+
+def decode_s_float(x):
+    return str(x['val'])
