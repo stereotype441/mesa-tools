@@ -226,7 +226,7 @@ def decode(x):
         if decoder_name in globals():
             return globals()[decoder_name](x)
     if x.type.code == gdb.TYPE_CODE_STRUCT:
-        return (label(x), str(x))
+        return (label(x), '{0}{1}'.format(x.type, x))
     return str(x)
 
 def compute_offset(master_type, field):
