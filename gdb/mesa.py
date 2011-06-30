@@ -35,40 +35,40 @@ ViewCmd()
 
 
 
-class DecodingPrettyPrinter(object):
-    def __init__(self, value, ptr):
-        self.value = value
-        self.ptr = ptr
-
-    def to_string(self):
-        if long(self.ptr) == 0:
-            return '({0}) 0x{1:x}'.format(self.ptr.type, 0)
-        return '({0}) 0x{1:x} {2}'.format(
-            self.ptr.type, long(self.ptr), pretty_print_short(self.value))
-
-def decoder_lookup_function(value):
-    try:
-        if value.type.code != gdb.TYPE_CODE_PTR:
-            return None
-        x = value.dereference()
-        if x.type.code == gdb.TYPE_CODE_PTR:
-            return None
-        x = generic_downcast(x)
-        tag = x.type.tag
-        if tag:
-            decoder_name = 'decode_{0}'.format(tag)
-            if decoder_name in globals():
-                return DecodingPrettyPrinter(x, value)
-    except:
-        pass
-    return None
-
-# Note: we register a lambda instead of registering
-# decoder_lookup_function so that if we are reloaded and
-# decoder_lookup_function has changed, the new function will be used.
-if 'DECODER_LOOKUP_FUNCTION_REGISTERED' not in globals():
-    gdb.pretty_printers.append(lambda x: decoder_lookup_function(x))
-    DECODER_LOOKUP_FUNCTION_REGISTERED = True
+#class DecodingPrettyPrinter(object):
+#    def __init__(self, value, ptr):
+#        self.value = value
+#        self.ptr = ptr
+#
+#    def to_string(self):
+#        if long(self.ptr) == 0:
+#            return '({0}) 0x{1:x}'.format(self.ptr.type, 0)
+#        return '({0}) 0x{1:x} {2}'.format(
+#            self.ptr.type, long(self.ptr), pretty_print_short(self.value))
+#
+#def decoder_lookup_function(value):
+#    try:
+#        if value.type.code != gdb.TYPE_CODE_PTR:
+#            return None
+#        x = value.dereference()
+#        if x.type.code == gdb.TYPE_CODE_PTR:
+#            return None
+#        x = generic_downcast(x)
+#        tag = x.type.tag
+#        if tag:
+#            decoder_name = 'decode_{0}'.format(tag)
+#            if decoder_name in globals():
+#                return DecodingPrettyPrinter(x, value)
+#    except:
+#        pass
+#    return None
+#
+## Note: we register a lambda instead of registering
+## decoder_lookup_function so that if we are reloaded and
+## decoder_lookup_function has changed, the new function will be used.
+#if 'DECODER_LOOKUP_FUNCTION_REGISTERED' not in globals():
+#    gdb.pretty_printers.append(lambda x: decoder_lookup_function(x))
+#    DECODER_LOOKUP_FUNCTION_REGISTERED = True
 
 
 
