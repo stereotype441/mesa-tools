@@ -560,7 +560,6 @@ def decode_ast_type_qualifier(x):
 
 def decode_ast_type_specifier(x):
     if str(x['type_specifier']) == 'ast_struct':
-        TODO("test me")
         return x['structure']
     else:
         return x['type_name'].string()
@@ -578,3 +577,9 @@ def decode_s_symbol(x):
 
 def decode_s_float(x):
     return str(x['val'])
+
+def decode_ast_struct_specifier(x):
+    yield label(x)
+    yield 'struct'
+    yield x['name'].string()
+    yield x['declarations']
