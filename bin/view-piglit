@@ -5,11 +5,11 @@ exec_short_name=`basename "$0"`
 usage()
 {
     echo "Usage"
-    echo "  $exec_short_name <regexp>"
+    echo "  $exec_short_name <regexps>"
     exit 1
 }
 
-(( $# == 1 )) || usage
+(( $# >= 1 )) || usage
 
 set -e
 platform checkactive
@@ -17,5 +17,7 @@ results_dir=$HOME/piglit-results
 summary_dir=$HOME/piglit-summary
 rmdir --ignore-fail-on-non-empty $results_dir/*
 cd "$PLATFORM_ROOT_DIR/piglit/source"
-find $results_dir -type d | grep "$1" | xargs ./piglit-summary-html.py --overwrite "$summary_dir"
+for arg in "$@"; do
+    find $results_dir -type d | sort | grep "$arg"
+done | xargs ./piglit-summary-html.py --overwrite "$summary_dir"
 gnome-open "$summary_dir/index.html"
