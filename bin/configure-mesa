@@ -7,7 +7,7 @@ cd "$build_dir"
 git-copy-working-tree "$HOME/mesa"
 git clean -f -x
 ./autogen.sh \
-    --disable-gallium \
+    --with-gallium-drivers= \
     --disable-gles1 \
     --disable-glut \
     --enable-debug \
