@@ -1,11 +1,9 @@
 #!/bin/bash
 set -e
 platform checkactive
-build_dir="$PLATFORM_ROOT_DIR/mesa"
-mkdir -p "$build_dir"
-cd "$build_dir"
-git-copy-working-tree "$HOME/mesa"
-git clean -f -x
+cd ~/mesa
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
 ./autogen.sh \
     --with-gallium-drivers= \
     --disable-gles1 \
@@ -20,4 +18,3 @@ git clean -f -x
     --with-dri-drivers=swrast,i915,i965 \
     CFLAGS="-O0 $CFLAGS" \
     CXXFLAGS="-O0 $CXXFLAGS"
-git tag -f configure
