@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/dri2proto
+git tag -d build || true
+git tag build `git-commit-working-tree`
+num_jobs=`getconf _NPROCESSORS_ONLN`
+make "-j$num_jobs"
+cd ~/glproto
+git tag -d build || true
+git tag build `git-commit-working-tree`
+make "-j$num_jobs"
