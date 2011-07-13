@@ -583,3 +583,29 @@ def decode_ast_struct_specifier(x):
     yield 'struct'
     yield x['name'].string()
     yield x['declarations']
+
+def decode_ir_texture(x):
+    yield label(x)
+    op_str = str(x['op'])
+    yield shorten(op_str, 'ir_')
+    yield x['type']
+    yield x['sampler']
+    yield x['coordinate']
+    yield x['offset'] or '0'
+    if op_str != 'ir_txf':
+        yield x['projector'] or '1'
+        yield x['shadow_comparitor'] or '()'
+    if op_str == 'ir_tex':
+        pass
+    elif op_str == 'ir_txb':
+        yield x['lod_info']['bias']
+    elif op_str in ('ir_txl', 'ir_txf'):
+        yield x['lod_info']['lod']
+    elif op_str == 'ir_txd':
+        yield [x['lod_info']['grad']['dPdx'], x['lod_info']['grad']['dPdy']]
+
+def decode_ir_dereference_record(x):
+    yield label(x)
+    yield 'record_ref'
+    yield x['record']
+    yield x['field'].string()
