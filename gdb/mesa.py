@@ -523,17 +523,14 @@ def decode_ast_expression(x):
         TODO("test me")
         yield x['primary_expression']['identifier'].string()
     elif op in UNARY_OPS:
-        TODO("test me")
         yield x['subexpressions'][0]
     elif op == 'conditional':
-        TODO("test me")
         yield x['subexpressions'][0]
         yield x['subexpressions'][1]
         yield x['subexpressions'][2]
     elif op == 'function_call':
-        TODO("test me")
         yield x['subexpressions'][0]
-        yield x['expressions'][0]
+        yield x['expressions']
     elif op == 'identifier':
         yield x['primary_expression']['identifier'].string()
     elif op in CONSTANT_TYPES:
@@ -609,3 +606,8 @@ def decode_ir_dereference_record(x):
     yield 'record_ref'
     yield x['record']
     yield x['field'].string()
+
+def decode_ast_function_expression(x):
+    # ast_function_expression derives from ast_expression, and uses
+    # its print routine.
+    return decode_ast_expression(x)
