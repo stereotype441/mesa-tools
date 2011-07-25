@@ -611,3 +611,180 @@ def decode_ast_function_expression(x):
     # ast_function_expression derives from ast_expression, and uses
     # its print routine.
     return decode_ast_expression(x)
+
+def mesa_num_inst_src_regs(opcode):
+    return int(gdb.parse_and_eval('InstInfo')[opcode]['NumSrcRegs'])
+
+def GET_SWZ(swz, idx):
+    # Based on GET_SWZ in prog_instruction.h
+    return (int(swz) >> int(idx)*3) & 7
+
+def mesa_swizzle_string(swizzle, negateMask, extended):
+    # Based on _mesa_swizzle_string() in prog_print.c
+    negateMask = int(negateMask)
+    swizzle = int(swizzle)
+    swz = 'xyzw01!?'
+    SWIZZLE_NOOP = 03210
+    if not extended and swizzle == SWIZZLE_NOOP and negateMask == 0:
+        return ''
+    parts = [
+        '{0}{1}'.format(
+            '-' if negateMask & (1 << idx) else '', swz[GET_SWZ(swizzle, idx)])
+        for idx, name in enumerate('xyzw')]
+    if extended:
+        return ','.join(parts)
+    else:
+        return '.' + ''.join(parts)
+
+def decode_prog_src_register(srcReg):
+    # Based on fprint_src_reg() in prog_print.c
+    abs_str = '|' if srcReg['Abs'] else ''
+    return '{0}{1}{2}{0}'.format(
+        abs_str,
+        reg_string(
+            srcReg['File'].cast(gdb.lookup_type('gl_register_file')),
+            srcReg['Index'], srcReg['RelAddr'], srcReg['HasIndex2'],
+            srcReg['RelAddr2'], srcReg['Index2']),
+        mesa_swizzle_string(srcReg['Swizzle'], srcReg['Negate'], False))
+
+def fprint_comment(inst):
+    # Based on fprint_comment() in prog_print.c
+    if inst['Comment']:
+        return ';  # {0}'.format(inst['Comment'].string())
+    else:
+        return ';'
+
+def mesa_fprint_alu_instruction(inst, opcode_string, numRegs):
+    # Based on _mesa_fprint_alu_instruction() in prog_print.c
+    result = opcode_string
+    if inst['CondUpdate']:
+        result += '.C'
+    if inst['SaturateMode']:
+        result += '_SAT'
+    result += ' '
+    if inst['DstReg']['File'] != gdb.parse_and_eval('PROGRAM_UNDEFINED'):
+        result += decode_prog_dst_register(inst['DstReg'])
+    else:
+        result += ' ???'
+    if numRegs > 0:
+        result += ', '
+    result += ', '.join(
+        decode_prog_src_register(inst['SrcReg'][j]) for j in xrange(numRegs))
+    result += fprint_comment(inst)
+    return result
+
+COND_TR = 8
+
+def decode_gl_register_file(f):
+    # Based on _mesa_register_file_name() in prog_print.c
+    table = {
+        'PROGRAM_TEMPORARY': 'TEMP',
+        'PROGRAM_LOCAL_PARAM': 'LOCAL',
+        'PROGRAM_ENV_PARAM': 'ENV',
+        'PROGRAM_STATE_VAR': 'STATE',
+        'PROGRAM_INPUT': 'INPUT',
+        'PROGRAM_OUTPUT': 'OUTPUT',
+        'PROGRAM_NAMED_PARAM': 'NAMED',
+        'PROGRAM_CONSTANT': 'CONST',
+        'PROGRAM_UNIFORM': 'UNIFORM',
+        'PROGRAM_VARYING': 'VARYING',
+        'PROGRAM_WRITE_ONLY': 'WRITE_ONLY',
+        'PROGRAM_ADDRESS': 'ADDR',
+        'PROGRAM_SAMPLER': 'SAMPLER',
+        'PROGRAM_SYSTEM_VALUE': 'SYSVAL',
+        'PROGRAM_UNDEFINED': 'UNDEFINED',
+        }
+    f_str = str(f)
+    if f_str in table:
+        return table[f_str]
+    else:
+        return 'FILE{0}'.format(int(f))
+
+def reg_string(f, index, relAddr, hasIndex2, relAddr2, index2):
+    # Based on reg_string() in prog_print.c
+    addr = 'ADDR=' if relAddr else ''
+    result = '{0}[{1}{2}]'.format(decode_gl_register_file(f), addr, index)
+    if hasIndex2:
+        addr2 = 'ADDR=' if relAddr2 else ''
+        result += '[{0}{1}]'.format(addr2, index2)
+    return result
+
+def mesa_writemask_string(writeMask):
+    # Based on _mesa_writemask_string() in prog_print.c
+    writeMask = int(writeMask)
+    if writeMask == 15:
+        return ''
+    else:
+        return '.{0}'.format(
+            ''.join(
+                s for s, mask in (('x', 1), ('y', 2), ('z', 4), ('w', 8))
+                if writeMask & mask))
+
+def decode_prog_dst_register(dstReg):
+    # Based on fprint_dst_reg() in prog_print.c
+    result = '{0}{1}'.format(
+        reg_string(
+            dstReg['File'].cast(gdb.lookup_type('gl_register_file')),
+            dstReg['Index'], dstReg['RelAddr'], False, False, 0),
+        mesa_writemask_string(dstReg['WriteMask']))
+    if dstReg['CondMask'] != COND_TR:
+        result += ' ({0}.{1})'.format(
+            mesa_condnode_string(dstReg['CondMask']),
+            mesa_swizzle_string(dstReg['CondSwizzle'], False, False))
+    return result
+
+def decode_prog_instruction(inst):
+    # Based on _mesa_fprint_instruction_opt() in prog_print.c
+    opcode = inst['Opcode']
+    opcode_str = shorten(str(opcode), 'OPCODE_')
+    if opcode_str == 'OPCODE_PRINT':
+        TODO()
+    elif opcode_str == 'OPCODE_SWZ':
+        TODO()
+    elif any(opcode_str == 'OPCODE_' + x
+             for x in ('TEX', 'TXP', 'TXL', 'TXB', 'TXD')):
+        TODO()
+    elif opcode_str == 'OPCODE_KIL':
+        TODO()
+    elif opcode_str == 'OPCODE_KIL_NV':
+        TODO()
+    elif opcode_str == 'OPCODE_ARL':
+        TODO()
+    elif opcode_str == 'OPCODE_BRA':
+        TODO()
+    elif opcode_str == 'OPCODE_IF':
+        TODO()
+    elif opcode_str == 'OPCODE_ELSE':
+        TODO()
+    elif opcode_str == 'OPCODE_ENDIF':
+        TODO()
+    elif opcode_str == 'OPCODE_BGNLOOP':
+        TODO()
+    elif opcode_str == 'OPCODE_ENDLOOP':
+        TODO()
+    elif opcode_str == 'OPCODE_BRK':
+        TODO()
+    elif opcode_str == 'OPCODE_CONT':
+        TODO()
+    elif opcode_str == 'OPCODE_BGNSUB':
+        TODO()
+    elif opcode_str == 'OPCODE_ENDSUB':
+        TODO()
+    elif opcode_str == 'OPCODE_CAL':
+        TODO()
+    elif opcode_str == 'OPCODE_RET':
+        TODO()
+    elif opcode_str == 'OPCODE_END':
+        TODO()
+    elif opcode_str == 'OPCODE_NOP':
+        TODO()
+    elif opcode_str == 'OPCODE_EMIT_VERTEX':
+        TODO()
+    elif opcode_str == 'OPCODE_END_PRIMITIVE':
+        TODO()
+    elif opcode < gdb.parse_and_eval('MAX_OPCODE'):
+        return mesa_fprint_alu_instruction(
+            inst, opcode_str, mesa_num_inst_src_regs(opcode))
+        TODO()
+    else:
+        TODO()
