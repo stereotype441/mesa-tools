@@ -1,8 +1,4 @@
 #!/bin/bash
 set -e
 cd ~/piglit
-if [[ $(git status 2> /dev/null | tail -n1) != "nothing to commit (working directory clean)" ]]; then
-    echo "Uncommited changes.  Not safe to clean."
-    exit 1
-fi
-git clean -d -x -f
+git clean -d -X -f
