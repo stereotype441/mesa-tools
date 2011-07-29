@@ -449,7 +449,7 @@ def downcast_exec_node(x):
     x = fully_deref(x)
     for downcaster in EXEC_NODE_DOWNCASTERS:
         try:
-            return generic_downcast(downcaster(x))
+            return generic_downcast(downcaster(x)).address
         except:
             # If anything went wrong, then presumably the value we
             # were looking at wasn't of the expected type.  Go on and
@@ -486,37 +486,91 @@ def decode_ast_expression_statement(x):
         'expression_statement',
         x['expression'] if x['expression'] else None)
 
-UNARY_OPS = ('plus', 'neg', 'bit_not', 'logic_not', 'pre_inc', 'pre_dec',
-             'post_inc', 'post_dec')
+AST_UNARY_OPS = {
+    'plus': "+",
+    'neg': "-",
+    'bit_not': "~",
+    'logic_not': "!",
+    'pre_inc': "++",
+    'pre_dec': "--",
+    'post_inc': "++",
+    'post_dec': "--",
+    }
 
-CONSTANT_TYPES = ('int_constant', 'uint_constant',
-                  'float_constant', 'bool_constant')
+AST_BINARY_OPS = {
+    'assign': "=",
+    'add': "+",
+    'sub': "-",
+    'mul': "*",
+    'div': "/",
+    'mod': "%",
+    'lshift': "<<",
+    'rshift': ">>",
+    'less': "<",
+    'greater': ">",
+    'lequal': "<=",
+    'gequal': ">=",
+    'equal': "==",
+    'nequal': "!=",
+    'bit_and': "&",
+    'bit_xor': "^",
+    'bit_or': "|",
+    'logic_and': "&&",
+    'logic_xor': "^^",
+    'logic_or': "||",
+    'mul_assign': "*=",
+    'div_assign': "/=",
+    'mod_assign': "%=",
+    'add_assign': "+=",
+    'sub_assign': "-=",
+    'ls_assign': "<<=",
+    'rs_assign': ">>=",
+    'and_assign': "&=",
+    'xor_assign': "^=",
+    'or_assign': "|=",
+    }
+
+AST_CONSTANT_TYPES = {
+    'int_constant': 'i',
+    'uint_constant': 'ui',
+    'float_constant': 'f',
+    'bool_constant': 'b'
+    }
 
 def decode_ast_expression(x):
+    def format_list(exprs):
+        comma_needed = False
+        for item in decode(exprs):
+            if comma_needed:
+                yield ','
+            yield item
+            comma_needed = True
+
     op = shorten(str(x['oper']), 'ast_')
-    yield op
     if op == 'field_selection':
         TODO("test me")
-        yield x['primary_expression']['identifier'].string()
-    elif op in UNARY_OPS:
-        yield x['subexpressions'][0]
+        return (op, x['primary_expression']['identifier'].string())
+    elif op in AST_UNARY_OPS:
+        if op.startswith('post_'):
+            return (x['subexpressions'][0], AST_UNARY_OPS[op])
+        else:
+            return (AST_UNARY_OPS[op], x['subexpressions'][0])
     elif op == 'conditional':
-        yield x['subexpressions'][0]
-        yield x['subexpressions'][1]
-        yield x['subexpressions'][2]
+        return (x['subexpressions'][0],
+                '?', x['subexpressions'][1],
+                ':', x['subexpressions'][2])
     elif op == 'function_call':
-        yield x['subexpressions'][0]
-        yield x['expressions']
+        return (x['subexpressions'][0], format_list(x['expressions']))
     elif op == 'identifier':
-        yield x['primary_expression']['identifier'].string()
-    elif op in CONSTANT_TYPES:
-        yield x['primary_expression'][op]
+        return x['primary_expression']['identifier'].string()
+    elif op in AST_CONSTANT_TYPES:
+        return str(x['primary_expression'][op]) + AST_CONSTANT_TYPES[op]
     elif op == 'sequence':
         TODO("test me")
-        yield x['expressions']
+        return (op, x['expressions'])
     else:
-        yield x['subexpressions'][0]
-        yield x['subexpressions'][1]
+        return (x['subexpressions'][0],
+                AST_BINARY_OPS[op], x['subexpressions'][1])
 
 def decode_ast_type_qualifier(x):
     q = x['flags']['q']
