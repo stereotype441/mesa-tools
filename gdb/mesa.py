@@ -96,11 +96,6 @@ class History(object):
 
 VIEW_HISTORY = History()
 
-class newline(object):
-    pass
-
-NEWLINE = newline()
-
 def shorten(s, prefix, discard = None):
     """Shorten string s by removing prefix (if present).  Then, if s
     == discard, shorten to None.
@@ -139,35 +134,39 @@ def format_label(value):
 
 def pretty_print(sexp, writer = gdb.write):
     exceptions = []
-    def traverse(sexp, prefix):
+    def traverse(sexp):
         sexp, addr = eval_for_pretty_print(sexp, exceptions)
         if addr is not None:
-            writer('{0}:'.format(format_label(addr.dereference())))
+            result = '{0}:'.format(format_label(addr.dereference()))
+        else:
+            result = ''
         if isinstance(sexp, basestring):
-            writer(sexp)
+            result += sexp
         elif isinstance(sexp, collections.Iterable):
-            prefix = prefix + ' '
-            writer('(')
+            parts = []
+            multiline = False
             try:
-                space_needed = False
                 for item in sexp:
                     if item is None:
                         continue
-                    elif isinstance(item, newline):
-                        writer('\n' + prefix)
-                        space_needed = False
-                    else:
-                        if space_needed: writer(' ')
-                        traverse(item, prefix)
-                        space_needed = True
+                    parts.append(traverse(item))
             except Exception, e:
                 exceptions.append(sys.exc_info())
-                if space_needed: writer(' ')
-                writer('...{0}...'.format(e))
-            finally:
-                gdb.write(')')
-    traverse(sexp, '')
-    writer('\n')
+                parts.append('...{0}...'.format(e))
+            result += '('
+            for i, part in enumerate(parts):
+                if i == 0:
+                    result += part
+                elif '\n' not in result and '\n' not in part and \
+                        len(result) + len(part) + 1 <= 70:
+                    result += ' ' + part
+                else:
+                    result += '\n' + part
+            result = result.replace('\n', '\n ') + ')'
+        else:
+            result += str(sexp)
+        return result
+    writer(traverse(sexp) + '\n')
     if exceptions:
         writer('First exception:\n')
         for line in traceback.format_exception(*exceptions[0]):
@@ -182,8 +181,6 @@ def pretty_print_short(sexp):
         try:
             for item in sexp:
                 if item is None:
-                    continue
-                elif isinstance(item, newline):
                     continue
                 elif isinstance(item, gdb.Value):
                     x = fully_deref(item)
@@ -308,15 +305,11 @@ def decode_ir_variable(x):
 def decode_ir_function_signature(x):
     def decode_param_list(params):
         yield 'parameters'
-        yield NEWLINE
         for param in iter_exec_list(params):
             yield param
-            yield NEWLINE
     yield 'signature'
     yield x['return_type']
-    yield NEWLINE
     yield decode_param_list(x['parameters'])
-    yield NEWLINE
     yield x['body']
 
 def decode_ir_assignment(x):
@@ -405,13 +398,13 @@ def decode_ir_constant(x):
 def decode_ir_loop(x):
     return (
         'loop', (x['counter'] or None,), (x['from'] or None,),
-        (x['to'] or None,), (x['increment'] or None,), NEWLINE,
+        (x['to'] or None,), (x['increment'] or None,),
         x['body_instructions'])
 
 def decode_ir_if(x):
     return (
-        'if', x['condition'], NEWLINE,
-        x['then_instructions'], NEWLINE,
+        'if', x['condition'],
+        x['then_instructions'],
         x['else_instructions'])
 
 def decode_ir_loop_jump(x):
@@ -419,7 +412,7 @@ def decode_ir_loop_jump(x):
 
 def decode_ir_function(x):
     return (
-        'function', x['name'].string(), NEWLINE,
+        'function', x['name'].string(),
         [signature.dereference().cast(gdb.lookup_type('ir_function_signature'))
          for signature in iter_exec_list(x['signatures'])])
 
@@ -441,7 +434,6 @@ def decode_ir_return(x):
 def decode_exec_list(x):
     for item in iter_exec_list(x):
         yield downcast_exec_node(item)
-        yield NEWLINE
 
 def decode_exec_node(x):
     return downcast_exec_node(x)
@@ -469,7 +461,7 @@ def downcast_exec_node(x):
 def decode_ast_declarator_list(x):
     return (
         'declarator_list', x['type'] or None,
-        'invariant' if x['invariant'] else None, NEWLINE, x['declarations'])
+        'invariant' if x['invariant'] else None, x['declarations'])
 
 def decode_ast_declaration(x):
     return (
@@ -479,7 +471,7 @@ def decode_ast_declaration(x):
 
 def decode_ast_function_definition(x):
     return (
-        'function_definition', x['prototype'], NEWLINE, x['body'])
+        'function_definition', x['prototype'], x['body'])
 
 def decode_ast_function(x):
     return (
@@ -487,7 +479,7 @@ def decode_ast_function(x):
         x['parameters'])
 
 def decode_ast_compound_statement(x):
-    return ('compound_statement', NEWLINE, x['statements'])
+    return ('compound_statement', x['statements'])
 
 def decode_ast_expression_statement(x):
     return (
