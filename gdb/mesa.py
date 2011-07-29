@@ -788,3 +788,6 @@ def decode_prog_instruction(inst):
         TODO()
     else:
         TODO()
+
+def decode_ast_expression_bin(x):
+    return decode_ast_expression(x)
