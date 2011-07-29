@@ -96,15 +96,6 @@ class History(object):
 
 VIEW_HISTORY = History()
 
-class label(object):
-    def __init__(self, value):
-        assert isinstance(value, gdb.Value)
-        self.__value = value
-
-    @property
-    def value(self):
-        return self.__value
-
 class newline(object):
     pass
 
@@ -127,18 +118,18 @@ def fully_deref(value):
     return value
 
 def eval_for_pretty_print(sexp, exceptions = None):
+    if isinstance(sexp, gdb.Value) and sexp.type.code == gdb.TYPE_CODE_PTR:
+        addr = sexp
+    else:
+        addr = None
     while isinstance(sexp, gdb.Value):
         try:
             sexp = decode(sexp)
         except Exception, e:
             if exceptions is not None:
                 exceptions.append(sys.exc_info())
-            error_string = '...{0}...'.format(e)
-            if sexp.address != None:
-                sexp = (label(sexp), error_string)
-            else:
-                sexp = error_string
-    return sexp
+            sexp = '...{0}...'.format(e)
+    return sexp, addr
 
 def format_label(value):
     if value.address is None:
@@ -149,11 +140,11 @@ def format_label(value):
 def pretty_print(sexp, writer = gdb.write):
     exceptions = []
     def traverse(sexp, prefix):
-        sexp = eval_for_pretty_print(sexp, exceptions)
+        sexp, addr = eval_for_pretty_print(sexp, exceptions)
+        if addr is not None:
+            writer('{0}:'.format(format_label(addr.dereference())))
         if isinstance(sexp, basestring):
             writer(sexp)
-        elif isinstance(sexp, label):
-            writer('{0}:'.format(format_label(sexp.value)))
         elif isinstance(sexp, collections.Iterable):
             prefix = prefix + ' '
             writer('(')
@@ -183,7 +174,7 @@ def pretty_print(sexp, writer = gdb.write):
             writer(line)
 
 def pretty_print_short(sexp):
-    sexp = eval_for_pretty_print(sexp)
+    sexp, addr = eval_for_pretty_print(sexp)
     if isinstance(sexp, basestring):
         return sexp
     elif isinstance(sexp, collections.Iterable):
@@ -193,8 +184,6 @@ def pretty_print_short(sexp):
                 if item is None:
                     continue
                 elif isinstance(item, newline):
-                    continue
-                elif isinstance(item, label):
                     continue
                 elif isinstance(item, gdb.Value):
                     x = fully_deref(item)
@@ -226,7 +215,7 @@ def decode(x):
         if decoder_name in globals():
             return globals()[decoder_name](x)
     if x.type.code == gdb.TYPE_CODE_STRUCT:
-        return (label(x), '{0}{1}'.format(x.type, x))
+        return '{0}{1}'.format(x.type, x)
     return str(x)
 
 def compute_offset(master_type, field):
@@ -304,7 +293,7 @@ def decode_glsl_type(x):
 def decode_ir_variable(x):
     # TODO: uniquify name
     return (
-        label(x), 'declare', (
+        'declare', (
             ('centroid' if x['centroid'] else None),
             ('invariant' if x['invariant'] else None),
             shorten(
@@ -323,7 +312,6 @@ def decode_ir_function_signature(x):
         for param in iter_exec_list(params):
             yield param
             yield NEWLINE
-    yield label(x)
     yield 'signature'
     yield x['return_type']
     yield NEWLINE
@@ -338,12 +326,12 @@ def decode_ir_assignment(x):
         if (write_mask & (1 << i)) != 0:
             write_mask_str += "xyzw"[i]
     return (
-        label(x), 'assign', x['condition'] or None, (write_mask_str or None,),
+        'assign', x['condition'] or None, (write_mask_str or None,),
         x['lhs'], x['rhs'])
 
 def decode_ir_dereference_variable(x):
     # TODO: uniquify name
-    return (label(x), 'var_ref', x['var']['name'].string())
+    return ('var_ref', x['var']['name'].string())
 
 OP_TYPE_TABLE = { 'unop': 1, 'binop': 2, 'quadop': 4 }
 OP_TABLE = {
@@ -377,14 +365,14 @@ def decode_ir_expression(x):
     operation = operation[(4+len(op_type)):]
     if operation in OP_TABLE:
         operation = OP_TABLE[operation]
-    return [label(x), 'expression', x['type'], operation] + \
+    return ['expression', x['type'], operation] + \
         [x['operands'][i] for i in xrange(num_operands)]
 
 def decode_ir_swizzle(x):
     swizzle_mask = ""
     for i in xrange(int(x['mask']['num_components'])):
         swizzle_mask += "xyzw"[int(x['mask']["xyzw"[i]])]
-    return (label(x), 'swiz', swizzle_mask, x['val'])
+    return ('swiz', swizzle_mask, x['val'])
 
 BASE_TYPE_TO_UNION_SELECTOR = {
     'GLSL_TYPE_UINT': 'u',
@@ -412,17 +400,17 @@ def decode_ir_constant(x):
         union_selector = BASE_TYPE_TO_UNION_SELECTOR[glsl_base_type]
         matrix = x['value'][union_selector]
         constant_value = tuple(matrix[i] for i in xrange(num_components))
-    return (label(x), 'constant', x['type'], constant_value)
+    return ('constant', x['type'], constant_value)
 
 def decode_ir_loop(x):
     return (
-        label(x), 'loop', (x['counter'] or None,), (x['from'] or None,),
+        'loop', (x['counter'] or None,), (x['from'] or None,),
         (x['to'] or None,), (x['increment'] or None,), NEWLINE,
         x['body_instructions'])
 
 def decode_ir_if(x):
     return (
-        label(x), 'if', x['condition'], NEWLINE,
+        'if', x['condition'], NEWLINE,
         x['then_instructions'], NEWLINE,
         x['else_instructions'])
 
@@ -431,24 +419,21 @@ def decode_ir_loop_jump(x):
 
 def decode_ir_function(x):
     return (
-        label(x), 'function', x['name'].string(), NEWLINE,
+        'function', x['name'].string(), NEWLINE,
         [signature.dereference().cast(gdb.lookup_type('ir_function_signature'))
          for signature in iter_exec_list(x['signatures'])])
 
 def decode_ir_call(x):
-    yield label(x)
     yield 'call'
     yield x['callee']['_function']['name'].string()
     yield x['actual_parameters']
 
 def decode_ir_dereference_array(x):
-    yield label(x)
     yield 'array_ref'
     yield x['array']
     yield x['array_index']
 
 def decode_ir_return(x):
-    yield label(x)
     yield 'return'
     if x['value']:
         yield x['value']
@@ -483,30 +468,30 @@ def downcast_exec_node(x):
 
 def decode_ast_declarator_list(x):
     return (
-        label(x), 'declarator_list', x['type'] or None,
+        'declarator_list', x['type'] or None,
         'invariant' if x['invariant'] else None, NEWLINE, x['declarations'])
 
 def decode_ast_declaration(x):
     return (
-        label(x), 'declaration', x['identifier'].string(),
+        'declaration', x['identifier'].string(),
         '[{0}]'.format(x['array_size']) if x['array_size'] else None,
         x['initializer'] or None)
 
 def decode_ast_function_definition(x):
     return (
-        label(x), 'function_definition', x['prototype'], NEWLINE, x['body'])
+        'function_definition', x['prototype'], NEWLINE, x['body'])
 
 def decode_ast_function(x):
     return (
-        label(x), 'function', x['return_type'], x['identifier'].string(),
+        'function', x['return_type'], x['identifier'].string(),
         x['parameters'])
 
 def decode_ast_compound_statement(x):
-    return (label(x), 'compound_statement', NEWLINE, x['statements'])
+    return ('compound_statement', NEWLINE, x['statements'])
 
 def decode_ast_expression_statement(x):
     return (
-        label(x), 'expression_statement',
+        'expression_statement',
         x['expression'] if x['expression'] else None)
 
 UNARY_OPS = ('plus', 'neg', 'bit_not', 'logic_not', 'pre_inc', 'pre_dec',
@@ -516,7 +501,6 @@ CONSTANT_TYPES = ('int_constant', 'uint_constant',
                   'float_constant', 'bool_constant')
 
 def decode_ast_expression(x):
-    yield label(x)
     op = shorten(str(x['oper']), 'ast_')
     yield op
     if op == 'field_selection':
@@ -562,10 +546,9 @@ def decode_ast_type_specifier(x):
         return x['type_name'].string()
 
 def decode_ast_fully_specified_type(x):
-    return (label(x), 'type', x['qualifier'], x['specifier'])
+    return ('type', x['qualifier'], x['specifier'])
 
 def decode_s_list(x):
-    yield label(x)
     for item in iter_exec_list(x['subexpressions']):
         yield downcast_exec_node(item)
 
@@ -576,13 +559,11 @@ def decode_s_float(x):
     return str(x['val'])
 
 def decode_ast_struct_specifier(x):
-    yield label(x)
     yield 'struct'
     yield x['name'].string()
     yield x['declarations']
 
 def decode_ir_texture(x):
-    yield label(x)
     op_str = str(x['op'])
     yield shorten(op_str, 'ir_')
     yield x['type']
@@ -602,7 +583,6 @@ def decode_ir_texture(x):
         yield [x['lod_info']['grad']['dPdx'], x['lod_info']['grad']['dPdy']]
 
 def decode_ir_dereference_record(x):
-    yield label(x)
     yield 'record_ref'
     yield x['record']
     yield x['field'].string()
