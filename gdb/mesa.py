@@ -224,8 +224,8 @@ def decode(x):
         decoder_name = 'decode_{0}'.format(tag)
         if decoder_name in globals():
             return globals()[decoder_name](x)
-    if x.type.code == gdb.TYPE_CODE_STRUCT:
-        return '{0}{1}'.format(x.type, x)
+        else:
+            return '...No decoder for {0}...'.format(tag)
     return str(x)
 
 def compute_offset(master_type, field):
