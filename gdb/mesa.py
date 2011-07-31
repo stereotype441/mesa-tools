@@ -612,7 +612,9 @@ def decode_ast_type_specifier(x):
         return x['type_name'].string()
 
 def decode_ast_fully_specified_type(x):
-    return ('type', x['qualifier'], x['specifier'])
+    for qual in decode(x['qualifier']):
+        yield qual
+    yield x['specifier']
 
 def decode_s_list(x):
     for item in iter_exec_list(x['subexpressions']):
@@ -837,3 +839,12 @@ def decode_prog_instruction(inst):
 
 def decode_ast_expression_bin(x):
     return decode_ast_expression(x)
+
+def decode_ast_parameter_declarator(x):
+    yield x['type']
+    if x['identifier']:
+        yield x['identifier'].string()
+    if x['is_array']:
+        yield '['
+        yield x['array_size']
+        yield ']'
