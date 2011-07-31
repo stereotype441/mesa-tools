@@ -204,6 +204,17 @@ def is_char_ptr(typ):
         typ.target().code == gdb.TYPE_CODE_INT and \
         typ.target().sizeof == 1
 
+def print_very_short(value):
+    """Useful in debugging"""
+    if not isinstance(value, gdb.Value):
+        return '<{0}>'.format(type(value))
+    elif value.type.code == gdb.TYPE_CODE_PTR:
+        return '({0}) 0x{1:x}'.format(value.type, long(value))
+    elif value.address is not None:
+        return '*({0})'.format(print_very_short(value.address))
+    else:
+        return '({0}) ...'.format(value.type)
+
 def decode(x):
     if is_char_ptr(x.type):
         return str(x)
