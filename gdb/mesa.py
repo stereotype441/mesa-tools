@@ -156,6 +156,7 @@ def pretty_print(sexp, writer = gdb.write):
                 exceptions.append(sys.exc_info())
                 parts.append('...{0}...'.format(e))
             result += '('
+            indentation = ' '*len(result)
             for i, part in enumerate(parts):
                 if i == 0:
                     result += part
@@ -164,7 +165,7 @@ def pretty_print(sexp, writer = gdb.write):
                     result += ' ' + part
                 else:
                     result += '\n' + part
-            result = result.replace('\n', '\n ') + ')'
+            result = result.replace('\n', '\n' + indentation) + ')'
         else:
             result += str(sexp)
         return result
