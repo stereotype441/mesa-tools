@@ -275,7 +275,13 @@ def generic_downcast(value):
     if vptr is None:
         return value
     vtable_entry = str(vptr[-1])
-    derived_class_name = TYPEINFO_REGEXP.search(vtable_entry).group(1)
+    typeinfo_match = TYPEINFO_REGEXP.search(vtable_entry)
+    if typeinfo_match is None:
+        # vptr didn't point to valid data.  We are probably looking at
+        # uninitialized memory or something, so just return value as
+        # is.
+        return value
+    derived_class_name = typeinfo_match.group(1)
     derived_class = gdb.lookup_type(derived_class_name)
     return value.cast(derived_class)
 
