@@ -134,7 +134,9 @@ def format_label(value):
 
 def pretty_print(sexp, writer = gdb.write):
     exceptions = []
-    def traverse(sexp):
+    def traverse(sexp, depth):
+        if depth == 16:
+            return '...recursion too deep...'
         sexp, addr = eval_for_pretty_print(sexp, exceptions)
         if addr is not None:
             result = '{0}:'.format(format_label(addr.dereference()))
@@ -149,7 +151,7 @@ def pretty_print(sexp, writer = gdb.write):
                 for item in sexp:
                     if item is None:
                         continue
-                    parts.append(traverse(item))
+                    parts.append(traverse(item, depth+1))
             except Exception, e:
                 exceptions.append(sys.exc_info())
                 parts.append('...{0}...'.format(e))
@@ -166,7 +168,7 @@ def pretty_print(sexp, writer = gdb.write):
         else:
             result += str(sexp)
         return result
-    writer(traverse(sexp) + '\n')
+    writer(traverse(sexp, 0) + '\n')
     if exceptions:
         writer('First exception:\n')
         for line in traceback.format_exception(*exceptions[0]):
