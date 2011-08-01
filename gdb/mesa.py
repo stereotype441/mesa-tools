@@ -112,21 +112,23 @@ def fully_deref(value):
         value = value.dereference()
     return value
 
-def eval_for_pretty_print(sexp, exceptions = None):
-    if isinstance(sexp, gdb.Value):
-        if sexp.type.code == gdb.TYPE_CODE_PTR:
-            addr = sexp
-        else:
-            addr = None
+def eval_for_pretty_print(value, exceptions = None):
+    if isinstance(value, gdb.Value):
         try:
-            sexp = decode(sexp)
+            if is_char_ptr(value.type):
+                addr = value
+                sexp = str(value)
+            else:
+                value = generic_downcast(fully_deref(value))
+                addr = value.address
+                sexp = decode(value)
         except Exception, e:
             if exceptions is not None:
                 exceptions.append(sys.exc_info())
             sexp = '...{0}...'.format(e)
         return sexp, addr
     else:
-        return sexp, None
+        return value, None
 
 def format_label(value):
     if value.address is None:
@@ -219,9 +221,6 @@ def print_very_short(value):
         return '({0}) ...'.format(value.type)
 
 def decode(x):
-    if is_char_ptr(x.type):
-        return str(x)
-    x = generic_downcast(fully_deref(x))
     tag = x.type.tag
     if tag:
         decoder_name = 'decode_{0}'.format(tag)
