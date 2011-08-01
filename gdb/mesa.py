@@ -562,7 +562,7 @@ AST_CONSTANT_TYPES = {
 def decode_ast_expression(x):
     def format_list(exprs):
         comma_needed = False
-        for item in decode(exprs):
+        for item in decode_exec_list(exprs):
             if comma_needed:
                 yield ','
             yield item
@@ -614,7 +614,7 @@ def decode_ast_type_specifier(x):
         return x['type_name'].string()
 
 def decode_ast_fully_specified_type(x):
-    for qual in decode(x['qualifier']):
+    for qual in decode_ast_type_qualifier(x['qualifier']):
         yield qual
     yield x['specifier']
 
