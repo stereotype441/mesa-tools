@@ -594,17 +594,19 @@ def decode_ast_expression(x):
                 AST_BINARY_OPS[op], x['subexpressions'][1])
 
 def decode_ast_type_qualifier(x):
+    result = []
     q = x['flags']['q']
     def do_words(*words):
         for word in words:
-            if q[word]: yield word
-    if q['constant']: yield 'const'
+            if q[word]: result.append(word)
+    if q['constant']: result.append('const')
     do_words('invariant', 'attribute', 'varying')
     if q['in'] and q['out']:
-        yield 'inout'
+        result.append('inout')
     else:
         do_words('in', 'out')
     do_words('centroid', 'uniform', 'smooth', 'flat', 'noperspective')
+    return result
 
 def decode_ast_type_specifier(x):
     if str(x['type_specifier']) == 'ast_struct':
