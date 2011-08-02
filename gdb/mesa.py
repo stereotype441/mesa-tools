@@ -274,6 +274,8 @@ def find_vptr(value):
     return None
 
 def generic_downcast(value):
+    if value.address == 0:
+        return value
     vptr = find_vptr(value)
     if vptr is None:
         return value
