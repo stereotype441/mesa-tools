@@ -479,7 +479,12 @@ def decode_exec_list(x):
         yield downcast_exec_node(item)
 
 def decode_exec_node(x):
-    return downcast_exec_node(x)
+    x = downcast_exec_node(x)
+    if x.type.tag == 'exec_node':
+        # This should never happen.  If it does, raise an exception to
+        # avoid infinite regress.
+        raise Exception('Attempt to downcast exec_node resulted in exec_node')
+    return decode(x)
 
 TYPEINFO_REGEXP = re.compile('<typeinfo for (.*)>')
 AST_NODE_LINK_DE_ACCESSOR = None
