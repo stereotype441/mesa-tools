@@ -119,8 +119,9 @@ def eval_for_pretty_print(value, exceptions = None):
                 addr = value
                 sexp = str(value)
             else:
+                addr = value.address # In case an exception occurs below
                 value = generic_downcast(fully_deref(value))
-                addr = value.address
+                addr = value.address # The real address after downcasting
                 sexp = decode(value)
         except Exception, e:
             if exceptions is not None:
