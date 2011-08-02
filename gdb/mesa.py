@@ -246,6 +246,8 @@ def decode(x):
             return globals()[decoder_name](x)
         else:
             return '...No decoder for {0}...'.format(tag)
+    if x.type.code == gdb.TYPE_CODE_PTR:
+        raise Exception('Pointer unexpectedly passed to decode()')
     return str(x)
 
 def compute_offset(master_type, field):
