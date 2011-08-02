@@ -267,7 +267,7 @@ def iter_type_and_bases(typ):
                 types_to_search.append(f.type)
 
 def find_vptr(value):
-    for typ in iter_type_and_bases(value.type):
+    for typ in iter_type_and_bases(value.type.unqualified()):
         try:
             type_name = str(typ)
             return value['_vptr.{0}'.format(type_name)]
