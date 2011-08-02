@@ -331,7 +331,6 @@ def decode_glsl_type(x):
         return x['name'].string()
 
 def decode_ir_variable(x):
-    # TODO: uniquify name
     return (
         'declare', (
             ('centroid' if x['centroid'] else None),
@@ -367,7 +366,13 @@ def decode_ir_assignment(x):
 
 def decode_ir_dereference_variable(x):
     # TODO: uniquify name
-    return ('var_ref', x['var']['name'].string())
+    if x['var']['name']:
+        unadorned_name = x['var']['name'].string()
+    else:
+        unadorned_name = '<unnamed>'
+    var_name = '{0}:{1}'.format(format_label(x['var'].dereference()),
+                                unadorned_name)
+    return ('var_ref', var_name)
 
 OP_TYPE_TABLE = { 'unop': 1, 'binop': 2, 'quadop': 4 }
 OP_TABLE = {
