@@ -490,7 +490,7 @@ def downcast_exec_node(x):
     x = fully_deref(x)
     for downcaster in EXEC_NODE_DOWNCASTERS:
         try:
-            return generic_downcast(downcaster(x)).address
+            return generic_downcast(downcaster(x))
         except:
             # If anything went wrong, then presumably the value we
             # were looking at wasn't of the expected type.  Go on and
