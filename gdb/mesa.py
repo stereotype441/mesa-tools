@@ -222,6 +222,8 @@ def print_very_short(value):
         return '({0}) ...'.format(value.type)
 
 def decode(x):
+    if x.address == 0:
+        return 'NULL'
     tag = x.type.tag
     if tag:
         decoder_name = 'decode_{0}'.format(tag)
