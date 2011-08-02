@@ -35,6 +35,18 @@ ViewCmd()
 
 
 
+class ClearViewHistoryCmd(gdb.Command):
+    def __init__(self):
+        gdb.Command.__init__(self, "clear_view_history",
+                             gdb.COMMAND_DATA, # display in help for data cmds
+                             gdb.COMPLETE_NONE # don't autocomplete
+                             )
+
+    def invoke(self, argument, from_tty):
+        VIEW_HISTORY.clear()
+
+ClearViewHistoryCmd()
+
 class StringPrettyPrinter(object):
     """GDB-compliant pretty-printer object that simply returns the
     string it was initialized with.
@@ -81,6 +93,9 @@ def TODO(*detail):
 
 class History(object):
     def __init__(self):
+        self.clear()
+
+    def clear(self):
         self._values = []
         self._reverse = {}
 
