@@ -40,4 +40,4 @@ result = ''.join(shortenings[0])
 if defunct:
     result += ' (defunct)'
 
-print result
+print(result)
