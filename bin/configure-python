@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+platform checkactive
+build_dir="$PLATFORM_ROOT_DIR/Python-2.7.2"
+if [ -d "$build_dir" ]; then
+    rm -r "$build_dir"
+fi
+cd "$PLATFORM_ROOT_DIR"
+tar -xvjf "$HOME/Downloads/Python-2.7.2.tar.bz2"
+cd Python-2.7.2
+./configure \
+    "--prefix=$PLATFORM_INSTALL_DIR"

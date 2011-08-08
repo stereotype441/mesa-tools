@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd "$PLATFORM_ROOT_DIR/Python-2.7.2"
+make install
