@@ -5,6 +5,8 @@ cd ~/mesa
 git tag -d configure || true
 git tag configure `git-commit-working-tree`
 ./autogen.sh \
+    --with-gallium-drivers=swrast \
+    --enable-gallium-llvm \
     --disable-gles1 \
     --disable-glut \
     --enable-debug \
