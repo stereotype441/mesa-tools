@@ -292,7 +292,7 @@ def find_vptr(value):
             pass
     return None
 
-def generic_downcast(value):
+def generic_downcast(value, strict=False):
     if value.address == 0:
         return value
     vptr = find_vptr(value)
@@ -302,9 +302,13 @@ def generic_downcast(value):
     typeinfo_match = TYPEINFO_REGEXP.search(vtable_entry)
     if typeinfo_match is None:
         # vptr didn't point to valid data.  We are probably looking at
-        # uninitialized memory or something, so just return value as
-        # is.
-        return value
+        # uninitialized memory or something.
+        if (strict):
+            raise Exception('Cound not downcast {0} value at 0x{1:x}'.format(
+                    value.type, long(value.address)))
+        else:
+            # Return the value as is so we can limp along.
+            return value
     derived_class_name = typeinfo_match.group(1)
     derived_class = gdb.lookup_type(derived_class_name)
     return value.cast(derived_class)
@@ -502,7 +506,7 @@ def downcast_exec_node(x):
     x = fully_deref(x)
     for downcaster in EXEC_NODE_DOWNCASTERS:
         try:
-            return generic_downcast(downcaster(x))
+            return generic_downcast(downcaster(x), strict=True)
         except:
             # If anything went wrong, then presumably the value we
             # were looking at wasn't of the expected type.  Go on and
