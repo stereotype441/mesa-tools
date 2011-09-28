@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/mesa
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
+./autogen.sh \
+    --with-gallium-drivers= \
+    --disable-gles1 \
+    --disable-glut \
+    --enable-debug \
+    --enable-egl \
+    --enable-egl \
+    --enable-gles2 \
+    --enable-selinux \
+    --enable-texture-float \
+    --enable-32-bit \
+    --disable-64-bit \
+    "--prefix=$PLATFORM_INSTALL_DIR" \
+    --with-dri-drivers=swrast,i915,i965 \
+    CFLAGS="-O0 $CFLAGS" \
+    CXXFLAGS="-O0 $CXXFLAGS"
