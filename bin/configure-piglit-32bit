@@ -19,8 +19,6 @@ cmake \
     -DCMAKE_C_FLAGS_DEBUG="-g -O0" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" \
     -DCMAKE_EXE_LINKER_FLAGS="-lselinux" \
-    -DCMAKE_SYSTEM_PROCESSOR=i386 \
-    -DCMAKE_LIBRARY_PATH=/usr/lib \
     "-DCMAKE_INSTALL_PREFIX=$PLATFORM_INSTALL_DIR" \
     ../source
 cd "$build_dir/source"
