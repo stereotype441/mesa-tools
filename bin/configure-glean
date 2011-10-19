@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/glean
+git tag -d configure || true
+git tag configure `git-commit-working-tree`

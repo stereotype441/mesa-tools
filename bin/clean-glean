@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd ~/glean
+git clean -d -X -f

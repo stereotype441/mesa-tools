@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/glean
+git tag -d build || true
+git tag build `git-commit-working-tree`
+num_jobs=`getconf _NPROCESSORS_ONLN`
+glean_root=`pwd`
+cd src
+GLEAN_ROOT=$glean_root PLATFORM=Unix make install "-j$num_jobs"
