@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd ~/drm
+git clean -d -X -f
