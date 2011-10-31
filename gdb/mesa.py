@@ -344,8 +344,8 @@ def decode_ir_variable(x):
                 'ir_var_', 'auto'),
             shorten(
                 str(x['interpolation'].cast(
-                        gdb.lookup_type('ir_variable_interpolation'))),
-                'ir_var_', 'smooth')),
+                        gdb.lookup_type('glsl_interp_qualifier'))).lower(),
+                'interp_qualifier_', 'none')),
         x['type'], x['name'])
 
 def decode_ir_function_signature(x):
