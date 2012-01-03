@@ -34,6 +34,7 @@
 
 import os.path
 import sys
+import subprocess
 
 def usage():
     exec_short_name = os.path.basename(sys.argv[0])
@@ -42,13 +43,30 @@ def usage():
   {0} use <platform>: start subshell with platform active
   {0} using <platform> <cmd>: run cmd with platform active
   {0} list: list all platforms
-  {0} checkactive: succeed if a platform is active""".format(exec_short_name)
+  {0} checkactive: succeed if a platform is active
+  {0} build: build current platform
+""".format(exec_short_name)
     exit(1)
 
+def fix_path(env):
+    # Because Python's exec functions don't understand ~ in PATH
+    if 'PATH' in env:
+        env['PATH'] = os.pathsep.join(os.path.expanduser(p) for p in env['PATH'].split(os.pathsep))
+
+def runcmds(cmds):
+    env = dict(os.environ)
+    fix_path(env)
+    try:
+        for cmd in cmds:
+            result = subprocess.check_call(cmd, close_fds=True, env=env)
+    except subprocess.CalledProcessError, e:
+        exit(e.returncode)
+
 class Platform(object):
-    def __init__(self, name, parents):
+    def __init__(self, name, parents, buildcmds = None):
         self.__name = name
         self.__parents = parents
+        self.__buildcmds = buildcmds
 
     @property
     def parents(self):
@@ -64,13 +82,9 @@ class Platform(object):
                 env[envname] = os.pathsep.join([newpath, env[envname]])
             else:
                 env[envname] = newpath
-        def fix_path():
-            # Because Python's exec functions don't understand ~ in PATH
-            if 'PATH' in env:
-                env['PATH'] = os.pathsep.join(os.path.expanduser(p) for p in env['PATH'].split(os.pathsep))
 
         env = dict(os.environ)
-        fix_path()
+        fix_path(env)
         env['PLATFORM_NAME'] = self.__name
         root = os.path.join(os.path.expanduser('~'), '.platform', self.__name)
         try:
@@ -92,17 +106,36 @@ class Platform(object):
             prepend('PKG_CONFIG_PATH', os.path.join(install_dir, 'lib', 'pkgconfig'))
         return env
 
+    @property
+    def buildcmds(self):
+        if self.__buildcmds is None:
+            print "Don't know how to build platform {0}".format(self.__name)
+            exit(1)
+        return self.__buildcmds
+
 ALL_PLATFORMS = {
-    'drm': Platform(name = 'drm', parents = []),
-    'glean-mesa': Platform(name = 'glean-mesa', parents = ['glean-mesa', 'proto', 'drm']),
-    'llvm-2.9': Platform(name = 'llvm-2.9', parents = []),
-    'mesa': Platform(name = 'mesa', parents = ['proto', 'drm']),
-    'mesa-32': Platform(name = 'mesa-32', parents = ['proto', 'drm']),
-    'mesa-gallium': Platform(name = 'mesa-gallium', parents = ['proto', 'llvm-2.9', 'drm']),
-    'piglit-gallium': Platform(name = 'piglit-gallium', parents = ['piglit-gallium', 'mesa-gallium', 'proto', 'llvm-2.9', 'drm']),
-    'piglit-mesa': Platform(name = 'piglit-mesa', parents = ['piglit-mesa', 'mesa', 'proto', 'drm']),
-    'piglit-mesa-32': Platform(name = 'piglit-mesa-32', parents = ['piglit-mesa-32', 'mesa-32', 'proto', 'drm']),
-    'proto': Platform(name = 'proto', parents = []),
+    'drm': Platform(name = 'drm', parents = [], buildcmds = ['build-drm', 'install-drm']),
+    'glean-mesa': Platform(name = 'glean-mesa', parents = ['glean-mesa', 'proto', 'drm'], buildcmds = ['build-glean']),
+    'llvm-2.9': Platform(name = 'llvm-2.9', parents = [], buildcmds = ['build-llvm', 'install-llvm']),
+    'mesa': Platform(name = 'mesa',
+                     parents = ['proto', 'drm'],
+                     buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+    'mesa-32': Platform(name = 'mesa-32',
+                        parents = ['proto', 'drm'],
+                        buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+    'mesa-gallium': Platform(name = 'mesa-gallium',
+                             parents = ['proto', 'llvm-2.9', 'drm'],
+                             buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+    'piglit-gallium': Platform(name = 'piglit-gallium',
+                               parents = ['piglit-gallium', 'mesa-gallium', 'proto', 'llvm-2.9', 'drm'],
+                               buildcmds = ['build-piglit', 'install-piglit']),
+    'piglit-mesa': Platform(name = 'piglit-mesa',
+                            parents = ['piglit-mesa', 'mesa', 'proto', 'drm'],
+                            buildcmds = ['build-piglit', 'install-piglit']),
+    'piglit-mesa-32': Platform(name = 'piglit-mesa-32',
+                               parents = ['piglit-mesa-32', 'mesa-32', 'proto', 'drm'],
+                               buildcmds = ['build-piglit', 'install-piglit']),
+    'proto': Platform(name = 'proto', parents = [], buildcmds = ['build-proto', 'install-proto']),
 }
 
 def get_platform(platform_name):
@@ -111,6 +144,12 @@ def get_platform(platform_name):
     else:
         print 'Platform {0!r} does not exist'.format(platform_name)
         exit(1)
+
+def get_current_platform():
+    if 'PLATFORM_NAME' not in os.environ:
+        print 'No platform is active.'
+        exit(1)
+    return get_platform(os.environ['PLATFORM_NAME'])
 
 def main():
     nargs = len(sys.argv) - 1
@@ -149,9 +188,12 @@ def main():
     elif cmd == 'checkactive':
         if nargs != 1:
             usage()
-        if 'PLATFORM_NAME' not in os.environ:
-            print 'No platform is active.'
-            exit(1)
+        get_current_platform()
+    elif cmd == 'build':
+        if nargs != 1:
+            usage()
+        platform = get_current_platform()
+        runcmds(platform.buildcmds)
     else:
         usage()
 
