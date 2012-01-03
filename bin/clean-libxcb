@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd ~/xcb/libxcb
+git clean -d -X -f

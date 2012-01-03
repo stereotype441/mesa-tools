@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/xcb/libxcb
+git tag -d install || true
+git tag install `git-commit-working-tree`
+make install
