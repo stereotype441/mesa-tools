@@ -159,6 +159,10 @@ ALL_PLATFORMS = {
                       parents = [],
                       cconfcmds = ['clean-proto', 'configure-proto'],
                       binstcmds = ['build-proto', 'install-proto']),
+    'xcb-proto': Platform(name = 'xcb-proto',
+                          parents = [],
+                          cconfcmds = ['clean-xcb-proto', 'configure-xcb-proto'],
+                          binstcmds = ['build-xcb-proto', 'install-xcb-proto']),
 }
 
 def get_platform(platform_name):

@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/xcb/proto
+git tag -d build || true
+git tag build `git-commit-working-tree`
+num_jobs=`getconf _NPROCESSORS_ONLN`
+make "-j$num_jobs"

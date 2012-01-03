@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/xcb/proto
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
+./autogen.sh "--prefix=$PLATFORM_INSTALL_DIR"

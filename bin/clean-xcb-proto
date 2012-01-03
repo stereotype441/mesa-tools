@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd ~/xcb/proto
+git clean -d -X -f
