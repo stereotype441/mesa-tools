@@ -44,7 +44,7 @@ def usage():
   {0} using <platform> <cmd>: run cmd with platform active
   {0} list: list all platforms
   {0} checkactive: succeed if a platform is active
-  {0} build <platform>: build platform (defaults to current)
+  {0} binst <platform>: build and install platform (defaults to current)
 """.format(exec_short_name)
     exit(1)
 
@@ -62,10 +62,10 @@ def runcmds(cmds, env):
         exit(e.returncode)
 
 class Platform(object):
-    def __init__(self, name, parents, buildcmds = None):
+    def __init__(self, name, parents, binstcmds = None):
         self.__name = name
         self.__parents = parents
-        self.__buildcmds = buildcmds
+        self.__binstcmds = binstcmds
 
     @property
     def parents(self):
@@ -106,35 +106,35 @@ class Platform(object):
         return env
 
     @property
-    def buildcmds(self):
-        if self.__buildcmds is None:
+    def binstcmds(self):
+        if self.__binstcmds is None:
             print "Don't know how to build platform {0}".format(self.__name)
             exit(1)
-        return self.__buildcmds
+        return self.__binstcmds
 
 ALL_PLATFORMS = {
-    'drm': Platform(name = 'drm', parents = [], buildcmds = ['build-drm', 'install-drm']),
-    'glean-mesa': Platform(name = 'glean-mesa', parents = ['glean-mesa', 'proto', 'drm'], buildcmds = ['build-glean']),
-    'llvm-2.9': Platform(name = 'llvm-2.9', parents = [], buildcmds = ['build-llvm', 'install-llvm']),
+    'drm': Platform(name = 'drm', parents = [], binstcmds = ['build-drm', 'install-drm']),
+    'glean-mesa': Platform(name = 'glean-mesa', parents = ['glean-mesa', 'proto', 'drm'], binstcmds = ['build-glean']),
+    'llvm-2.9': Platform(name = 'llvm-2.9', parents = [], binstcmds = ['build-llvm', 'install-llvm']),
     'mesa': Platform(name = 'mesa',
                      parents = ['proto', 'drm'],
-                     buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                     binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
     'mesa-32': Platform(name = 'mesa-32',
                         parents = ['proto', 'drm'],
-                        buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                        binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
     'mesa-gallium': Platform(name = 'mesa-gallium',
                              parents = ['proto', 'llvm-2.9', 'drm'],
-                             buildcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                             binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
     'piglit-gallium': Platform(name = 'piglit-gallium',
                                parents = ['piglit-gallium', 'mesa-gallium', 'proto', 'llvm-2.9', 'drm'],
-                               buildcmds = ['build-piglit', 'install-piglit']),
+                               binstcmds = ['build-piglit', 'install-piglit']),
     'piglit-mesa': Platform(name = 'piglit-mesa',
                             parents = ['piglit-mesa', 'mesa', 'proto', 'drm'],
-                            buildcmds = ['build-piglit', 'install-piglit']),
+                            binstcmds = ['build-piglit', 'install-piglit']),
     'piglit-mesa-32': Platform(name = 'piglit-mesa-32',
                                parents = ['piglit-mesa-32', 'mesa-32', 'proto', 'drm'],
-                               buildcmds = ['build-piglit', 'install-piglit']),
-    'proto': Platform(name = 'proto', parents = [], buildcmds = ['build-proto', 'install-proto']),
+                               binstcmds = ['build-piglit', 'install-piglit']),
+    'proto': Platform(name = 'proto', parents = [], binstcmds = ['build-proto', 'install-proto']),
 }
 
 def get_platform(platform_name):
@@ -195,15 +195,15 @@ def main():
         if nargs != 1:
             usage()
         get_current_platform()
-    elif cmd == 'build':
+    elif cmd == 'binst':
         if nargs == 1:
             platform = get_current_platform()
-            runcmds(platform.buildcmds, os.environ)
+            runcmds(platform.binstcmds, os.environ)
         elif nargs == 2:
             check_not_active()
             platform_name = sys.argv[2]
             platform = get_platform(platform_name)
-            runcmds(platform.buildcmds, platform.setup_env())
+            runcmds(platform.binstcmds, platform.setup_env())
         else:
             usage()
     else:
