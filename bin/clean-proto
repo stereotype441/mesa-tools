@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+cd ~/dri2proto
+git clean -d -X -f
+cd ~/glproto
+git clean -d -X -f
