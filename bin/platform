@@ -44,7 +44,7 @@ def usage():
   {0} using <platform> <cmd>: run cmd with platform active
   {0} list: list all platforms
   {0} checkactive: succeed if a platform is active
-  {0} build: build current platform
+  {0} build <platform>: build platform (defaults to current)
 """.format(exec_short_name)
     exit(1)
 
@@ -53,8 +53,7 @@ def fix_path(env):
     if 'PATH' in env:
         env['PATH'] = os.pathsep.join(os.path.expanduser(p) for p in env['PATH'].split(os.pathsep))
 
-def runcmds(cmds):
-    env = dict(os.environ)
+def runcmds(cmds, env):
     fix_path(env)
     try:
         for cmd in cmds:
@@ -151,6 +150,11 @@ def get_current_platform():
         exit(1)
     return get_platform(os.environ['PLATFORM_NAME'])
 
+def check_not_active():
+    if 'PLATFORM_NAME' in os.environ:
+        print 'Platform {0!r} is already active'.format(os.environ['PLATFORM_NAME'])
+        exit(1)
+
 def main():
     nargs = len(sys.argv) - 1
     if nargs < 1:
@@ -168,12 +172,14 @@ def main():
     elif cmd == 'use':
         if nargs != 2:
             usage()
+        check_not_active()
         platform_name = sys.argv[2]
         platform = get_platform(platform_name)
         os.execve('/bin/bash', ['bash'], platform.setup_env())
     elif cmd == 'using':
         if nargs < 3:
             usage()
+        check_not_active()
         platform_name = sys.argv[2]
         platform = get_platform(platform_name)
         env = platform.setup_env()
@@ -190,10 +196,16 @@ def main():
             usage()
         get_current_platform()
     elif cmd == 'build':
-        if nargs != 1:
+        if nargs == 1:
+            platform = get_current_platform()
+            runcmds(platform.buildcmds, os.environ)
+        elif nargs == 2:
+            check_not_active()
+            platform_name = sys.argv[2]
+            platform = get_platform(platform_name)
+            runcmds(platform.buildcmds, platform.setup_env())
+        else:
             usage()
-        platform = get_current_platform()
-        runcmds(platform.buildcmds)
     else:
         usage()
 
