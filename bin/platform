@@ -45,7 +45,8 @@ def usage():
   {0} list: list all platforms
   {0} checkactive: succeed if a platform is active
   {0} binst <platform>: build and install platform (defaults to current)
-  {0} cbinst <platform>: clean, configure, build and install platform (defaults to current)
+  {0} cbinst <platform>: clean, configure, build, and install platform (defaults to current)
+  {0} cbrec <platform>: clean, configure, build, and install platform and parents
 """.format(exec_short_name)
     exit(1)
 
@@ -187,6 +188,18 @@ def check_not_active():
         print 'Platform {0!r} is already active'.format(os.environ['PLATFORM_NAME'])
         exit(1)
 
+def topsort(platform_name):
+    result = []
+    def add_platform_and_deps(platform_name):
+        if platform_name in result:
+            return
+        for dep in get_platform(platform_name).parents:
+            if dep != platform_name:
+                add_platform_and_deps(dep)
+        result.append(platform_name)
+    add_platform_and_deps(platform_name)
+    return result
+
 def main():
     nargs = len(sys.argv) - 1
     if nargs < 1:
@@ -243,6 +256,16 @@ def main():
         else:
             cmds = platform.cconfcmds + platform.binstcmds
         runcmds(cmds, env)
+    elif cmd == 'cbrec':
+        if nargs != 2:
+            usage()
+        check_not_active()
+        for platform_name in topsort(sys.argv[2]):
+            print '*** clean/configure/build/install {0} ***'.format(platform_name)
+            platform = get_platform(platform_name)
+            env = platform.setup_env()
+            cmds = platform.cconfcmds + platform.binstcmds
+            runcmds(cmds, env)
     else:
         usage()
 
