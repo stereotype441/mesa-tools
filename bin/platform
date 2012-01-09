@@ -64,11 +64,12 @@ def runcmds(cmds, env):
         exit(e.returncode)
 
 class Platform(object):
-    def __init__(self, name, parents, cconfcmds = None, binstcmds = None):
+    def __init__(self, name, parents, cconfcmds = None, binstcmds = None, srcdirs = ()):
         self.__name = name
         self.__parents = parents
         self.__cconfcmds = cconfcmds
         self.__binstcmds = binstcmds
+        self.__srcdirs = tuple(srcdirs)
 
     @property
     def parents(self):
@@ -97,6 +98,7 @@ class Platform(object):
         env['PLATFORM_ROOT_DIR'] = root
         env['PLATFORM_DESC'] = self.desc
         env['PLATFORM_INSTALL_DIR'] = os.path.join(root, 'install')
+        env['PLATFORM_SRC_DIRS'] = ' '.join(os.path.expanduser(p) for p in self.__srcdirs)
         for parent in self.__parents:
             install_dir = os.path.join(os.path.expanduser('~'), '.platform', parent, 'install')
             prepend('CPATH', os.path.join(install_dir, 'include'))
@@ -124,30 +126,35 @@ class Platform(object):
 
 ALL_PLATFORMS = {
     'drm': Platform(name = 'drm',
+                    srcdirs = ['~/drm'],
                     parents = [],
                     cconfcmds = ['clean-drm', 'configure-drm'],
-                    binstcmds = ['build-drm', 'install-drm']),
+                    binstcmds = ['build-drm', 'install-platform']),
     'glean-mesa': Platform(name = 'glean-mesa',
                            parents = ['glean-mesa', 'proto', 'drm', 'xcb-proto', 'libxcb'],
                            cconfcmds = ['clean-glean', 'configure-glean'],
                            binstcmds = ['build-glean']),
     'libxcb': Platform(name = 'libxcb',
+                       srcdirs = ['~/xcb/libxcb'],
                        parents = ['xcb-proto'],
                        cconfcmds = ['clean-libxcb', 'configure-libxcb'],
-                       binstcmds = ['build-libxcb', 'install-libxcb']),
+                       binstcmds = ['build-libxcb', 'install-platform']),
     'llvm-2.9': Platform(name = 'llvm-2.9', parents = [], binstcmds = ['build-llvm', 'install-llvm']),
     'mesa': Platform(name = 'mesa',
+                     srcdirs = ['~/mesa'],
                      parents = ['proto', 'drm', 'xcb-proto', 'libxcb'],
                      cconfcmds = ['clean-mesa', 'configure-mesa'],
-                     binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                     binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
     'mesa-32': Platform(name = 'mesa-32',
+                        srcdirs = ['~/mesa'],
                         parents = ['proto', 'drm', 'xcb-proto', 'libxcb'],
                         cconfcmds = ['clean-mesa', 'configure-mesa-32bit'],
-                        binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                        binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
     'mesa-gallium': Platform(name = 'mesa-gallium',
+                             srcdirs = ['~/mesa'],
                              parents = ['proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb'],
                              cconfcmds = ['clean-mesa', 'configure-mesa-with-gallium'],
-                             binstcmds = ['build-mesa', 'check-mesa', 'install-mesa']),
+                             binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
     'piglit-gallium': Platform(name = 'piglit-gallium',
                                parents = ['piglit-gallium', 'mesa-gallium', 'proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb'],
                                cconfcmds = ['clean-piglit', 'configure-piglit'],
@@ -165,13 +172,15 @@ ALL_PLATFORMS = {
                              cconfcmds = ['clean-piglit', 'configure-piglit'],
                              binstcmds = ['build-piglit', 'install-piglit']),
     'proto': Platform(name = 'proto',
+                      srcdirs = ['~/dri2proto', '~/glproto'],
                       parents = [],
                       cconfcmds = ['clean-proto', 'configure-proto'],
-                      binstcmds = ['build-proto', 'install-proto']),
+                      binstcmds = ['build-proto', 'install-platform']),
     'xcb-proto': Platform(name = 'xcb-proto',
+                          srcdirs = ['~/xcb/proto'],
                           parents = [],
                           cconfcmds = ['clean-xcb-proto', 'configure-xcb-proto'],
-                          binstcmds = ['build-xcb-proto', 'install-xcb-proto']),
+                          binstcmds = ['build-xcb-proto', 'install-platform']),
 }
 
 def get_platform(platform_name):
