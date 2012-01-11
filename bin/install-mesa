@@ -1,7 +1,0 @@
-#!/bin/bash
-set -e
-platform checkactive
-cd ~/mesa
-git tag -d install || true
-git tag install `git-commit-working-tree`
-make install
