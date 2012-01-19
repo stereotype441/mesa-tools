@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/oglconform_31/src
+./build.linux debug 64
