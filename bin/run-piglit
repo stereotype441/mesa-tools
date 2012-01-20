@@ -21,7 +21,8 @@ piglit_source_dir=$PLATFORM_ROOT_DIR/piglit/source
 export PIGLIT_BUILD_DIR=$PLATFORM_ROOT_DIR/piglit/build
 timestamp=$(date -u +%Y-%m-%d-%H%M%S)
 long_name=$PLATFORM_NAME-$timestamp-$short_name
-result_dir=$result_parent_dir/$long_name
+result_dir=$HOME/tmp/piglit-result
 mkdir -p "$result_dir"
 cd "$piglit_source_dir"
 ./piglit-run.py -n "$long_name" "$@" tests/quick.tests "$result_dir"
+cp "$result_dir/main" "$result_parent_dir/$short_name"
