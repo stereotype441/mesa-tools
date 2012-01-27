@@ -159,7 +159,7 @@ ALL_PLATFORMS = {
                         srcdirs = ['~/mesa'],
                         parents = ['proto', 'drm-32', 'xcb-proto', 'libxcb-32'],
                         cconfcmds = ['clean-mesa', 'configure-mesa-32bit'],
-                        binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
+                        binstcmds = ['build-mesa', 'install-platform']), # Note: skipping check-mesa due to Fedora bug https://bugzilla.redhat.com/show_bug.cgi?id=771478
     'mesa-gallium': Platform(name = 'mesa-gallium',
                              srcdirs = ['~/mesa'],
                              parents = ['proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb'],
