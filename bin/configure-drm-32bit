@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/drm
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
+./autogen.sh \
+    --disable-radeon \
+    "--prefix=$PLATFORM_INSTALL_DIR" \
+    CFLAGS="-g -m32 -O0"
