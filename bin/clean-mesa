@@ -2,3 +2,8 @@
 set -e
 cd ~/mesa
 git clean -d -X -f
+
+# Work around bugs in "git clean"
+rm -rf src/glsl/obj-visible
+rm -rf src/mesa/objs-dricore
+rm -rf tests/glx/.libs
