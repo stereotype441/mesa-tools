@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+platform checkactive
+rm -rf "$PLATFORM_INSTALL_DIR"
+cd ~/oglconform_31/dump/linux/debug32/OGLconform
+mkdir -p "$PLATFORM_INSTALL_DIR/bin"
+cp oglconform "$PLATFORM_INSTALL_DIR/bin"
