@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/glapi
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
+./configure \
+    "--prefix=$PLATFORM_INSTALL_DIR"
