@@ -10,10 +10,10 @@ git tag configure `git-commit-working-tree`
     --disable-glut \
     --enable-debug \
     --enable-egl \
-    --enable-egl \
     --enable-gles2 \
     --enable-selinux \
     --enable-texture-float \
+    --enable-glx-tls \
     "--prefix=$PLATFORM_INSTALL_DIR" \
     --with-dri-drivers=swrast,i915,i965 \
     CFLAGS="-O0 $CFLAGS" \

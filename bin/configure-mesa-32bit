@@ -4,7 +4,7 @@ platform checkactive
 cd ~/mesa
 git tag -d configure || true
 git tag configure `git-commit-working-tree`
-./autogen.sh \
+CFLAGS="-O0 -m32 $CFLAGS" CXXFLAGS="-O0 -m32 $CXXFLAGS" ./autogen.sh \
     --with-gallium-drivers= \
     --disable-gles1 \
     --disable-glut \
@@ -17,6 +17,4 @@ git tag configure `git-commit-working-tree`
     --enable-32-bit \
     --disable-64-bit \
     "--prefix=$PLATFORM_INSTALL_DIR" \
-    --with-dri-drivers=swrast,i915,i965 \
-    CFLAGS="-O0 $CFLAGS" \
-    CXXFLAGS="-O0 $CXXFLAGS"
+    --with-dri-drivers=swrast,i915,i965

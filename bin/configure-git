@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+platform checkactive
+cd ~/git
+git tag -d configure || true
+git tag configure `git-commit-working-tree`
+autoreconf -v --install
+./configure \
+    "--prefix=$PLATFORM_INSTALL_DIR" \
+    CFLAGS="-O0 -g $CFLAGS" \
+    CXXFLAGS="-O0 -g $CXXFLAGS"

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+sudo umount /mnt/piglit-results
+sudo mkdir -p /mnt/piglit-results
+sudo mount otc-gfxtest-01.jf.intel.com:/mnt/results /mnt/piglit-results
+copy-piglit-results
+sudo umount /mnt/piglit-results

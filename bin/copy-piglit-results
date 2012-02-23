@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+cd /mnt/piglit-results/standard
+cd `ls | sort | tail -1`
+rm -rf $HOME/piglit-results/ref-new || true
+mkdir -p $HOME/piglit-results/ref-new
+for file in `ls`; do
+    echo "Copying piglit results for $file"
+    cp "$file/main" "$HOME/piglit-results/ref-new/$file"
+done
+rm -rf $HOME/piglit-results/ref || true
+mv $HOME/piglit-results/ref-new $HOME/piglit-results/ref
