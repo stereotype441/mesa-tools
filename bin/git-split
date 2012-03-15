@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -e
+SHA=`git rev-parse HEAD`
+SHA_SHORT=`git rev-parse --short HEAD`
+git reset HEAD^
+echo "Git add what you want in the first commit, then exit the subshell."
+echo "Exit with a nonzero error code to abort."
+if SUBSHELL_PREFIX="[split $SHA_SHORT] $SUBSHELL_PREFIX" bash; then
+    if git commit -c $SHA; then
+        git read-tree $SHA
+        if git commit -c $SHA; then
+            echo "Successfully split into two commits."
+        else
+            echo "Second commit failed."
+        fi
+    else
+        echo "First commit failed.  Aborting."
+        git reset --hard $SHA
+    fi
+else
+    echo "Split aborted."
+    git reset --hard $SHA
+fi
