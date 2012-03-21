@@ -3,7 +3,26 @@ import os
 import re
 
 
-PROCEDURE_NAME_REGEXP = re.compile('[a-zA-Z_][a-zA-Z0-9_]*')
+PROCEDURE_NAME_REGEXP = re.compile('[a-zA-Z_]([a-zA-Z0-9_]|{[a-z0-9, ]+})*')
+EXPANDO_REGEXP = re.compile('{[a-z0-9, ]+}')
+
+
+EXPANDO_EXPRESSIONS = {
+    '{i,f,d}': 'ifd',
+    '{fd}': 'fd',
+    '{ubusui}': ('ub', 'us', 'ui'),
+    '{1234}': '1234',
+    '{bsifd}': 'bsifd',
+    '{if}': 'if',
+    '{d,dv,f,fv}': ('d', 'dv', 'f', 'fv'),
+    '{dv,fv}': ('dv', 'fv'),
+    '{bdfis}': 'bdfis',
+    '{234}': '234',
+    '{34}': '34',
+    '{12}': '12',
+    '{sifd}': 'sifd',
+    '{bsifd ubusui}': ('b', 's', 'i', 'f', 'd', 'ub', 'us', 'ui'),
+    }
 
 
 RECOGNIZED_SECTIONS = ('', 'Name', 'Name Strings', 'Version', 'Number', 'Dependencies', 'Overview',
@@ -612,10 +631,25 @@ def group_sections(lines):
     return groups
 
 
+def expando(text):
+    m = EXPANDO_REGEXP.search(text)
+    if not m:
+        yield text
+        return
+    expando_expression = m.group(0)
+    if expando_expression not in EXPANDO_EXPRESSIONS:
+        print 'Unknown expando expression: {0}'.format(expando_expression)
+        return
+    for expansion in EXPANDO_EXPRESSIONS[expando_expression]:
+        for item in expando(text[:m.start(0)] + expansion + text[m.end(0):]):
+            yield item
+
+
 def extract_tokens(text):
     tokens = set()
     for m in PROCEDURE_NAME_REGEXP.finditer(text):
-        tokens.add(m.group(0))
+        for item in expando(m.group(0)):
+            tokens.add(item)
     return tokens
 
 
