@@ -1,4 +1,9 @@
+import json
 import os
+import re
+
+
+PROCEDURE_NAME_REGEXP = re.compile('[a-zA-Z_][a-zA-Z0-9_]*')
 
 
 RECOGNIZED_SECTIONS = ('', 'Name', 'Name Strings', 'Version', 'Number', 'Dependencies', 'Overview',
@@ -607,6 +612,13 @@ def group_sections(lines):
     return groups
 
 
+def extract_tokens(text):
+    tokens = set()
+    for m in PROCEDURE_NAME_REGEXP.finditer(text):
+        tokens.add(m.group(0))
+    return tokens
+
+
 def handle_file(extension_name, f):
     sections = []
     section_name = ''
@@ -615,7 +627,10 @@ def handle_file(extension_name, f):
             sections.append((section_name, lines))
         else:
             section_name = ' '.join(lines)
+    procedure_data = []
     for section_name, section_contents in sections:
+        if section_name.lower().find('procedure') != -1:
+            procedure_data.extend(section_contents)
         if section_name.startswith('Additions to '):
             continue
         if section_name.startswith('Addition to '):
@@ -659,8 +674,14 @@ def handle_file(extension_name, f):
         if section_name in RECOGNIZED_SECTIONS:
             continue
         print 'Unrecognized section in {0}: {1!r}'.format(extension_name, section_name)
+    return extract_tokens('\n'.join(procedure_data))
 
 
+with open(os.path.expanduser('~/.platform/piglit-mesa/piglit/build/glapi/glapi.json'), 'r') as f:
+    api = json.load(f)
+
+
+procedure_tokens = {}
 for root, dirs, files in os.walk(os.path.expanduser('~/opengl-docs/www.opengl.org/registry/specs/')):
     dirroot, dirname = os.path.split(root)
     for filename in files:
@@ -668,4 +689,44 @@ for root, dirs, files in os.walk(os.path.expanduser('~/opengl-docs/www.opengl.or
         if fileext == '.txt':
             extension_name = '{0}_{1}'.format(dirname, fileroot)
             with open(os.path.join(root, filename), 'r') as f:
-                handle_file(extension_name, f)
+                procedure_tokens[extension_name] = handle_file(extension_name, f)
+
+
+found_functions = {}
+for ext, tokens in procedure_tokens.items():
+    found_functions[ext] = set()
+    for fname in api['functions'].keys():
+        if fname in tokens:
+            found_functions[ext].add(fname)
+
+
+expected_functions = {}
+for fname, fdata in api['functions'].items():
+    category_name = fdata['category']
+    category = api['categories'][category_name]
+    if category['kind'] != 'extension':
+        continue
+    category_name_short = category['extension_name'][3:]
+    if category_name_short not in expected_functions:
+        expected_functions[category_name_short] = set()
+    expected_functions[category_name_short].add(fname)
+
+
+extra_extensions_found = set(found_functions.keys()) - set(expected_functions.keys())
+if extra_extensions_found:
+    print 'Extra extensions found: {0}'.format(', '.join(extra_extensions_found))
+
+missing_extensions = set(expected_functions.keys()) - set(found_functions.keys())
+if missing_extensions:
+    print 'Missing extensions: {0}'.format(', '.join(missing_extensions))
+
+common_extensions = set(found_functions.keys()) & set(expected_functions.keys())
+for ext in common_extensions:
+    functions_found = found_functions[ext]
+    functions_expected = expected_functions[ext]
+    extra_functions = functions_found - functions_expected
+    if extra_functions:
+        print 'In {0}, extra functions found: {1}'.format(ext, ', '.join(extra_functions))
+    missing_functions = functions_expected - functions_found
+    if missing_functions:
+        print 'In {0}, missing functions: {1}'.format(ext, ', '.join(missing_functions))
