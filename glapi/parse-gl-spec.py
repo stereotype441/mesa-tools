@@ -645,10 +645,17 @@ def expando(text):
             yield item
 
 
-def extract_tokens(text):
+def extract_tokens(extension_name, text):
+    if extension_name in ('EXT_secondary_color', 'EXT_fog_coord'):
+        text = text.replace('[', '{')
+        text = text.replace(']', '}')
     tokens = set()
     for m in PROCEDURE_NAME_REGEXP.finditer(text):
         for item in expando(m.group(0)):
+            if item.startswith('gl'):
+                item = item[2:]
+            if extension_name == 'ATI_vertex_streams' and not item.endswith('ATI'):
+                item = item + 'ATI'
             tokens.add(item)
     return tokens
 
@@ -708,7 +715,7 @@ def handle_file(extension_name, f):
         if section_name in RECOGNIZED_SECTIONS:
             continue
         print 'Unrecognized section in {0}: {1!r}'.format(extension_name, section_name)
-    return extract_tokens('\n'.join(procedure_data))
+    return extract_tokens(extension_name, '\n'.join(procedure_data))
 
 
 with open(os.path.expanduser('~/.platform/piglit-mesa/piglit/build/glapi/glapi.json'), 'r') as f:
