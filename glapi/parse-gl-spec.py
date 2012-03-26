@@ -755,7 +755,13 @@ for fname, fdata in api['functions'].items():
 
 extra_extensions_found = set(found_functions.keys()) - set(expected_functions.keys())
 if extra_extensions_found:
-    print 'Extra extensions found: {0}'.format(', '.join(extra_extensions_found))
+    print 'Extra extensions found:'
+    for ext in extra_extensions_found:
+        functions_found = found_functions[ext]
+        if functions_found:
+            print '  {0}, containing functions: {1}'.format(ext, ', '.join(sorted(functions_found)))
+        else:
+            print '  {0}'.format(ext)
 
 missing_extensions = set(expected_functions.keys()) - set(found_functions.keys())
 if missing_extensions:
@@ -767,7 +773,7 @@ for ext in common_extensions:
     functions_expected = expected_functions[ext]
     extra_functions = functions_found - functions_expected
     if extra_functions:
-        print 'In {0}, extra functions found: {1}'.format(ext, ', '.join(extra_functions))
+        print 'In {0}, extra functions found: {1}'.format(ext, ', '.join(sorted(extra_functions)))
     missing_functions = functions_expected - functions_found
     if missing_functions:
-        print 'In {0}, missing functions: {1}'.format(ext, ', '.join(missing_functions))
+        print 'In {0}, missing functions: {1}'.format(ext, ', '.join(sorted(missing_functions)))
