@@ -1,8 +1,4 @@
 #!/bin/bash
-
-# Temporarily disabled because "make check" is currently broken in Mesa
-exit 0
-
 set -e
 platform checkactive
 cd ~/mesa
