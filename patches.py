@@ -44,7 +44,7 @@ def nice_time(timestamp):
     dt = datetime.datetime.utcfromtimestamp(timestamp)
     return dt.strftime('%Y%m%d-%H%M%S')
 
-def make_patches_from_mail_folder(folder_name, subject_patch_pairs):
+def make_patches_from_mail_folder(folder_name, summary_data):
     mbox_dir = os.path.join(os.path.expanduser('~/gmail'), folder_name)
     mbox = mailbox.Maildir(mbox_dir, create = False)
 
@@ -75,7 +75,7 @@ def make_patches_from_mail_folder(folder_name, subject_patch_pairs):
 
         filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
         path = os.path.join(PATCHES_DIR, filename)
-        subject_patch_pairs.append((subject, path))
+        summary_data.append((timestamp, subject, path))
         if not os.path.exists(path):
             msg_str = mbox.get_string(key)
             with open(path, 'w') as f:
@@ -83,12 +83,12 @@ def make_patches_from_mail_folder(folder_name, subject_patch_pairs):
             print path
 
 
-subject_patch_pairs = []
+summary_data = []
 for folder_name in ['Mesa-dev', 'Piglit']:
-    make_patches_from_mail_folder(folder_name, subject_patch_pairs)
+    make_patches_from_mail_folder(folder_name, summary_data)
 
 
-subject_patch_pairs.sort()
+summary_data.sort()
 with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
-    f.write(''.join('{0!r}: {1!r}\n'.format(subject, path)
-                    for subject, path in subject_patch_pairs))
+    f.write(''.join('{0} {1!r}: {2!r}\n'.format(nice_time(timestamp), subject, path)
+                    for timestamp, subject, path in summary_data))
