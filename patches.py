@@ -10,12 +10,6 @@ import email.utils
 import mailbox
 import os.path
 
-MBOX_DIR = os.path.expanduser('~/gmail/Mesa-dev')
-mbox = mailbox.Maildir(MBOX_DIR, create = False)
-
-stuff = []
-by_id = {}
-
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 
 PATCHES_DIR = os.path.expanduser('~/patches')
@@ -50,32 +44,51 @@ def nice_time(timestamp):
     dt = datetime.datetime.utcfromtimestamp(timestamp)
     return dt.strftime('%Y%m%d-%H%M%S')
 
-for key in mbox.keys():
-    msg = mbox[key]
-    decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
-    subject = ' '.join(decode_rfc2047_part(s, e) for s, e in decoded_subj)
+def make_patches_from_mail_folder(folder_name, subject_patch_pairs):
+    mbox_dir = os.path.join(os.path.expanduser('~/gmail'), folder_name)
+    mbox = mailbox.Maildir(mbox_dir, create = False)
 
-    # TODO: email.utils.mktime_tz makes slight errors around daylight savings time.
-    timestamp = email.utils.mktime_tz(email.utils.parsedate_tz(msg['Date']))
+    stuff = []
+    by_id = {}
 
-    message_id = msg['Message-Id']
-    in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
+    for key in mbox.keys():
+        msg = mbox[key]
+        decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
+        subject = ' '.join(decode_rfc2047_part(s, e) for s, e in decoded_subj)
 
-    summary = (timestamp, key, subject, in_reply_to)
+        # TODO: email.utils.mktime_tz makes slight errors around daylight savings time.
+        timestamp = email.utils.mktime_tz(email.utils.parsedate_tz(msg['Date']))
 
-    stuff.append(summary)
-    by_id[message_id] = summary
+        message_id = msg['Message-Id']
+        in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
 
-stuff.sort()
+        summary = (timestamp, key, subject, in_reply_to)
 
-for timestamp, key, subject, in_reply_to in stuff:
-    if subject.find('[PATCH') == -1 or subject.lower().startswith('re'):
-        continue
+        stuff.append(summary)
+        by_id[message_id] = summary
 
-    filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
-    path = os.path.join(PATCHES_DIR, filename)
-    if not os.path.exists(path):
-        msg_str = mbox.get_string(key)
-        with open(path, 'w') as f:
-            f.write(msg_str)
-        print path
+    stuff.sort()
+
+    for timestamp, key, subject, in_reply_to in stuff:
+        if subject.find('[PATCH') == -1 or subject.lower().startswith('re'):
+            continue
+
+        filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
+        path = os.path.join(PATCHES_DIR, filename)
+        subject_patch_pairs.append((subject, path))
+        if not os.path.exists(path):
+            msg_str = mbox.get_string(key)
+            with open(path, 'w') as f:
+                f.write(msg_str)
+            print path
+
+
+subject_patch_pairs = []
+for folder_name in ['Mesa-dev', 'Piglit']:
+    make_patches_from_mail_folder(folder_name, subject_patch_pairs)
+
+
+subject_patch_pairs.sort()
+with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
+    f.write(''.join('{0!r}: {1!r}\n'.format(subject, path)
+                    for subject, path in subject_patch_pairs))
