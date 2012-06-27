@@ -1,0 +1,23 @@
+#!/bin/bash
+
+case "$1" in
+    "anuj")
+        REVIEWER='Anuj Phogat <anuj.phogat@gmail.com>'
+        ;;
+    "chad")
+        REVIEWER='Chad Versace <chad.versace@linux.intel.com>'
+        ;;
+    "eric")
+        REVIEWER='Eric Anholt <eric@anholt.net>'
+        ;;
+    *)
+        echo "Unknown reviewer: $1"
+        exit 1
+        ;;
+esac
+
+OLD_MSG="`git log --format=format:%B -n 1`"
+RB_LINE="Reviewed-by: $REVIEWER"
+NEW_MSG="${OLD_MSG}"$'\n\n'"${RB_LINE}"
+
+git commit --amend -m "${NEW_MSG}"
