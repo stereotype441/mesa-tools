@@ -16,6 +16,12 @@ case "$1" in
     "ken")
         REVIEWER='Kenneth Graunke <kenneth@whitecape.org>'
         ;;
+    "ian")
+        REVIEWER='Ian Romanick <ian.d.romanick@intel.com>'
+        ;;
+    "jordan")
+        REVIEWER='Jordan Justen <jordan.l.justen@intel.com>'
+        ;;
     *)
         echo "Unknown reviewer: $1"
         exit 1
