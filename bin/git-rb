@@ -30,6 +30,16 @@ esac
 
 OLD_MSG="`git log --format=format:%B -n 1`"
 RB_LINE="Reviewed-by: $REVIEWER"
-NEW_MSG="${OLD_MSG}"$'\n\n'"${RB_LINE}"
 
-git commit --amend -m "${NEW_MSG}"
+if echo "${OLD_MSG}" | tail -n 1 | grep -q -E '^[a-zA-Z-]+[-]by:'; then
+    OPT_BLANK_LINE=''
+else
+    OPT_BLANK_LINE=$'\n'
+fi
+
+if echo "${OLD_MSG}" | grep -q -F "${RB_LINE}"; then
+    true # Reviewer already present in commit message
+else
+    NEW_MSG="${OLD_MSG}"$'\n'"${OPT_BLANK_LINE}${RB_LINE}"
+    git commit --amend -m "${NEW_MSG}"
+fi
