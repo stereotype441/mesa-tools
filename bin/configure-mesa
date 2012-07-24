@@ -11,7 +11,6 @@ git tag configure `git-commit-working-tree`
     --enable-debug \
     --enable-egl \
     --enable-gles2 \
-    --enable-selinux \
     --enable-texture-float \
     --enable-glx-tls \
     "--prefix=$PLATFORM_INSTALL_DIR" \
