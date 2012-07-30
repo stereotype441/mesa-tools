@@ -15,5 +15,6 @@ git tag configure `git-commit-working-tree`
     --enable-glx-tls \
     --with-dri-drivers=swrast,i915,i965 \
     --with-dri-driverdir=/usr/lib/xorg/modules/dri \
+    --prefix=/usr \
     CFLAGS="-O0 $CFLAGS" \
     CXXFLAGS="-O0 $CXXFLAGS"
