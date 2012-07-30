@@ -1,0 +1,9 @@
+#!/bin/bash
+sudo umount /mnt/test/proc
+sudo umount /mnt/test/dev/pts
+sudo umount /mnt/test/dev/shm
+sudo umount /mnt/test/dev
+sudo umount /mnt/test/home
+sudo umount /mnt/test/tmp
+sudo umount /mnt/test
+exit 0
