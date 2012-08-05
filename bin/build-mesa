@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-platform checkactive
 cd ~/mesa
 git tag -d build || true
 git tag build `git-commit-working-tree`

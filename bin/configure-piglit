@@ -16,7 +16,6 @@ cmake \
     -DCMAKE_BUILD_TYPE=debug \
     -DCMAKE_C_FLAGS_DEBUG="-g -O0" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" \
-    -DCMAKE_EXE_LINKER_FLAGS="-lselinux" \
     "-DCMAKE_INSTALL_PREFIX=$PLATFORM_INSTALL_DIR" \
     ../source
 cd "$build_dir/source"

@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+sudo mount /mnt/test
+sudo mount -o bind /proc /mnt/test/proc
+sudo mount -o bind /dev /mnt/test/dev
+sudo mount -o bind /dev/pts /mnt/test/dev/pts
+sudo mount -o bind /dev/shm /mnt/test/dev/shm
+sudo mount -o bind /home /mnt/test/home
+sudo mount -o bind /tmp /mnt/test/tmp

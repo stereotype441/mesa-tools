@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+umount-snapshot
+sudo btrfs subvolume delete /mnt/files/test || echo "Ok, nothing to delete"
+sudo btrfs subvolume snapshot /mnt/files/root /mnt/files/test
+mount-snapshot

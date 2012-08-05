@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-platform checkactive
 cd ~/mesa
 git tag -d configure || true
 git tag configure `git-commit-working-tree`
@@ -8,12 +7,14 @@ git tag configure `git-commit-working-tree`
     --with-gallium-drivers= \
     --disable-gles1 \
     --disable-glut \
+    --enable-glu \
     --enable-debug \
     --enable-egl \
     --enable-gles2 \
     --enable-texture-float \
     --enable-glx-tls \
-    "--prefix=$PLATFORM_INSTALL_DIR" \
     --with-dri-drivers=swrast,i915,i965 \
+    --with-dri-driverdir=/usr/lib/xorg/modules/dri \
+    --prefix=/usr \
     CFLAGS="-O0 $CFLAGS" \
     CXXFLAGS="-O0 $CXXFLAGS"
