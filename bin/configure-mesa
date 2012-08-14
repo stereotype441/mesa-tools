@@ -6,13 +6,14 @@ git tag -d configure || true
 git tag configure `git-commit-working-tree`
 ./autogen.sh \
     --with-gallium-drivers= \
-    --disable-gles1 \
+    --enable-gles1 \
     --disable-glut \
     --enable-debug \
     --enable-egl \
     --enable-gles2 \
     --enable-texture-float \
     --enable-glx-tls \
+    --enable-shared-glapi \
     "--prefix=$PLATFORM_INSTALL_DIR" \
     --with-dri-drivers=swrast,i915,i965 \
     CFLAGS="-O0 $CFLAGS" \
