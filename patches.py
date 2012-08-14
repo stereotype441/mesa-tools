@@ -20,7 +20,7 @@ except OSError:
     pass
 
 def decode_rfc2047_part(s, encoding):
-    if encoding is None or encoding in ['y', 'n', 'a']:
+    if encoding is None or encoding in ['y', 'n', 'a', 'j']:
         return s
     return s.decode(encoding)
 
