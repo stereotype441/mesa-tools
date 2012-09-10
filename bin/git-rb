@@ -1,38 +1,53 @@
 #!/bin/bash
 
-case "$1" in
-    "anuj")
-        REVIEWER='Anuj Phogat <anuj.phogat@gmail.com>'
-        ;;
-    "chad")
-        REVIEWER='Chad Versace <chad.versace@linux.intel.com>'
-        ;;
-    "eric")
-        REVIEWER='Eric Anholt <eric@anholt.net>'
-        ;;
-    "brianp")
-        REVIEWER='Brian Paul <brianp@vmware.com>'
-        ;;
-    "ken")
-        REVIEWER='Kenneth Graunke <kenneth@whitecape.org>'
-        ;;
-    "ian")
-        REVIEWER='Ian Romanick <ian.d.romanick@intel.com>'
-        ;;
-    "jordan")
-        REVIEWER='Jordan Justen <jordan.l.justen@intel.com>'
-        ;;
-    "matt")
-        REVIEWER='Matt Turner <mattst88@gmail.com>'
-        ;;
-    *)
-        echo "Unknown reviewer: $1"
-        exit 1
-        ;;
-esac
+REVIEW_TYPE=Reviewed
+
+while (( $# != 0 )); do
+    case $1 in
+        "--ack")
+            REVIEW_TYPE=Acked
+            ;;
+        "anuj")
+            REVIEWER='Anuj Phogat <anuj.phogat@gmail.com>'
+            ;;
+        "chad")
+            REVIEWER='Chad Versace <chad.versace@linux.intel.com>'
+            ;;
+        "eric")
+            REVIEWER='Eric Anholt <eric@anholt.net>'
+            ;;
+        "brianp")
+            REVIEWER='Brian Paul <brianp@vmware.com>'
+            ;;
+        "ken")
+            REVIEWER='Kenneth Graunke <kenneth@whitecape.org>'
+            ;;
+        "ian")
+            REVIEWER='Ian Romanick <ian.d.romanick@intel.com>'
+            ;;
+        "jordan")
+            REVIEWER='Jordan Justen <jordan.l.justen@intel.com>'
+            ;;
+        "matt")
+            REVIEWER='Matt Turner <mattst88@gmail.com>'
+            ;;
+        *)
+            echo "Unknown reviewer: $1"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [ ! "$REVIEWER" ]; then
+    echo "No reviewer given"
+    exit 1
+fi
 
 OLD_MSG="`git log --format=format:%B -n 1`"
-RB_LINE="Reviewed-by: $REVIEWER"
+RB_LINE="$REVIEW_TYPE-by: $REVIEWER"
+
+echo "$RB_LINE"
 
 if echo "${OLD_MSG}" | tail -n 1 | grep -q -E '^[a-zA-Z-]+[-]by:'; then
     OPT_BLANK_LINE=''
