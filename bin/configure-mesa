@@ -12,7 +12,6 @@ git tag configure `git-commit-working-tree`
     --enable-egl \
     --enable-gles2 \
     --enable-texture-float \
-    --enable-glx-tls \
     --enable-shared-glapi \
     "--prefix=$PLATFORM_INSTALL_DIR" \
     --with-dri-drivers=swrast,i915,i965 \
