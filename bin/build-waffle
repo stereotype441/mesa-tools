@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+cd ~/waffle
+git tag -d build || true
+git tag build `git-commit-working-tree`
+num_jobs=`getconf _NPROCESSORS_ONLN`
+make "-j$num_jobs"

@@ -1,0 +1,4 @@
+#!/bin/bash
+set -e
+cd ~/waffle
+git clean -d -x -f

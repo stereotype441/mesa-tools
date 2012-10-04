@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+cd ~/waffle
+git tag -d check || true
+git tag check `git-commit-working-tree`
+make check
