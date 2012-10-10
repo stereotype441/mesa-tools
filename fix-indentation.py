@@ -87,8 +87,6 @@ def pre_parse(text):
             comment_end = text.find('\n', m.end())
             if comment_end == -1:
                 comment_end = len(text)
-            else:
-                comment_end += 1
             yield 'comment', text[m.start():comment_end]
             pos = comment_end
             continue
