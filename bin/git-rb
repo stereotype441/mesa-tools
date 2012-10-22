@@ -7,6 +7,9 @@ while (( $# != 0 )); do
         "--ack")
             REVIEW_TYPE=Acked
             ;;
+        "--test")
+            REVIEW_TYPE=Tested
+            ;;
         "anuj")
             REVIEWER='Anuj Phogat <anuj.phogat@gmail.com>'
             ;;
