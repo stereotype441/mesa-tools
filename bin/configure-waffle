@@ -8,5 +8,6 @@ cmake \
     -Dwaffle_has_glx=1 \
     -Dwaffle_has_x11_egl=1 \
     -DCMAKE_BUILD_TYPE=debug \
+    -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_PREFIX="$PLATFORM_INSTALL_DIR" \
     .
