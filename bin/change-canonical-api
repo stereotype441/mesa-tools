@@ -394,7 +394,7 @@ def do_batch(renames, file_cache, analysis):
             analysis.fix_vectorequivs(old_canonical, new_canonical)
             analysis.move_glx(old_canonical, new_canonical)
             analysis.fix_sizes(old_canonical, new_canonical)
-            for prefix in ('_glptr_', 'CALL_', 'GET_', 'SET_', '_gloffset_'):
+            for prefix in ('_glptr_', 'CALL_', 'GET_', 'SET_', '_gloffset_', '__indirect_gl'):
                 c_changes[prefix + old_canonical] = prefix + new_canonical
     print('Renaming {0} functions in C/C++ code'.format(len(c_changes)))
     analysis.change_c_identifiers(c_changes)
