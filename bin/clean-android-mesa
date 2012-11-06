@@ -1,0 +1,11 @@
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/EXECUTABLES/glsl_compiler_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/SHARED_LIBRARIES/i965_dri_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/SHARED_LIBRARIES/libGLES_mesa_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/SHARED_LIBRARIES/libglapi_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/STATIC_LIBRARIES/libmesa_dri_common_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/STATIC_LIBRARIES/libmesa_dricore_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/STATIC_LIBRARIES/libmesa_egl_dri2_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/STATIC_LIBRARIES/libmesa_glsl_intermediates
+rm -rf ~/android/jb/out/target/product/lenovox220t/obj/STATIC_LIBRARIES/libmesa_glsl_utils_intermediates
+rm -rf ~/android/jb/out/host/linux-x86/obj/EXECUTABLES/mesa_builtin_compiler_intermediates
+rm -rf ~/android/jb/out/host/linux-x86/obj/EXECUTABLES/mesa_gen_matypes_intermediates
