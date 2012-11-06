@@ -10,6 +10,16 @@ import sys
 
 BATCH_MODE = True
 
+FUNCTION_PATTERNS = [
+    '_glptr_{0}',
+    'CALL_{0}',
+    'GET_{0}',
+    'SET_{0}',
+    '_gloffset_{0}',
+    '__indirect_gl{0}',
+    '__gl{0}_size',
+    ]
+
 C_IDENTIFIER = re.compile('[a-zA-Z_][a-zA-Z0-9_]*')
 XML_TOKEN = re.compile('<[^>]+>')
 XML_IDENTIFIER = re.compile('[a-zA-Z0-9_:]+')
@@ -394,8 +404,8 @@ def do_batch(renames, file_cache, analysis):
             analysis.fix_vectorequivs(old_canonical, new_canonical)
             analysis.move_glx(old_canonical, new_canonical)
             analysis.fix_sizes(old_canonical, new_canonical)
-            for prefix in ('_glptr_', 'CALL_', 'GET_', 'SET_', '_gloffset_', '__indirect_gl'):
-                c_changes[prefix + old_canonical] = prefix + new_canonical
+            for pattern in FUNCTION_PATTERNS:
+                c_changes[pattern.format(old_canonical)] = pattern.format(new_canonical)
     print('Renaming {0} functions in C/C++ code'.format(len(c_changes)))
     analysis.change_c_identifiers(c_changes)
 
