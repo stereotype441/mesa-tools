@@ -193,166 +193,180 @@ class XmlFile(File):
                 assert token.startswith('<')
         self.parsed = parse_xml(tokens)
 
-def read_file(filename, file_cache):
-    base, ext = os.path.splitext(filename)
-    ext = ext.lower()
-    if ext in ('.cpp', '.hpp', '.cc', '.hh', '.c', '.h'):
-        file_cache[filename] = CFile(filename)
-    elif ext == '.xml':
-        file_cache[filename] = XmlFile(filename)
+class FileCache(dict):
+    def read_file(self, filename):
+        base, ext = os.path.splitext(filename)
+        ext = ext.lower()
+        if ext in ('.cpp', '.hpp', '.cc', '.hh', '.c', '.h'):
+            self[filename] = CFile(filename)
+        elif ext == '.xml':
+            self[filename] = XmlFile(filename)
 
-def recursive_read(filename, file_cache):
-    if os.path.basename(filename) == '.git':
-        return
-    if os.path.islink(filename):
-        pass
-    elif os.path.isfile(filename):
-        read_file(filename, file_cache)
-    elif os.path.isdir(filename):
-        for file in os.listdir(filename):
-            recursive_read(os.path.join(filename, file), file_cache)
+    def recursive_read(self, filename):
+        if os.path.basename(filename) == '.git':
+            return
+        if os.path.islink(filename):
+            pass
+        elif os.path.isfile(filename):
+            self.read_file(filename)
+        elif os.path.isdir(filename):
+            for file in os.listdir(filename):
+                self.recursive_read(os.path.join(filename, file))
 
-def find_xml_func_definitions(file_cache):
-    by_name = {}
-    by_alias = collections.defaultdict(dict)
-    by_vectorequiv = collections.defaultdict(dict)
-    for key, value in file_cache.items():
-        if isinstance(value, XmlFile):
-            def recurse(items):
-                for item in items:
-                    if isinstance(item, Element):
-                        if item.tag() == 'function':
-                            fname = item.get_attr('name')
-                            assert fname not in by_name
-                            by_name[fname] = item
-                            falias = item.get_attr('alias')
-                            if falias is None:
-                                falias = fname
-                            by_alias[falias][fname] = item
-                            vectorequiv = item.get_attr('vectorequiv')
-                            if vectorequiv is not None:
-                                by_vectorequiv[vectorequiv][fname] = item
-                        recurse(item.items[1:-1])
-            recurse(value.parsed)
-    return by_name, by_alias, by_vectorequiv
+    def write_files(self):
+        for filename, model in self.items():
+            new_contents = ''.join(str(item) for item in model.parsed)
+            if new_contents != model.contents:
+                with open(filename, 'w', encoding='latin-1') as f:
+                    f.write(new_contents)
+                model.contents = new_contents
+                print('Wrote {0}'.format(filename))
 
-def move_params(src, dst):
-    for key, value in src.get_attr_list():
-        if key in ('name', 'type', 'padding'):
-            continue
-        elif key in ('client_only', 'count', 'counter', 'count_scale',
-                     'output', 'img_width', 'img_height', 'img_depth',
-                     'img_extent', 'img_xoff', 'img_yoff', 'img_zoff',
-                     'img_woff', 'img_format', 'img_type', 'img_target',
-                     'img_send_null', 'img_null_flag', 'img_pad_dimensions',
-                     'variable_param'):
-            src.unset_attr(key)
-            dst.set_attr(key, value)
-        else:
-            raise Exception(key)
+class Analysis(object):
+    def __init__(self, file_cache):
+        self.file_cache = file_cache
+        self.fn_by_name = {}
+        self.fn_by_alias = collections.defaultdict(dict)
+        self.fn_by_vectorequiv = collections.defaultdict(dict)
+        self.size_by_name = collections.defaultdict(list)
+        for key, value in file_cache.items():
+            if isinstance(value, XmlFile):
+                self.recurse(value.parsed)
 
-def join_strings(items, i):
-    if 0 < i < len(items) and isinstance(items[i-1], str) and isinstance(items[i], str):
-        combined = items[i-1] + items[i]
-        items[i-1:i+1] = [combined]
+    def recurse(self, items):
+        for item in items:
+            if isinstance(item, Element):
+                if item.tag() == 'function':
+                    fname = item.get_attr('name')
+                    assert fname not in self.fn_by_name
+                    self.fn_by_name[fname] = item
+                    falias = item.get_attr('alias')
+                    if falias is None:
+                        falias = fname
+                    self.fn_by_alias[falias][fname] = item
+                    vectorequiv = item.get_attr('vectorequiv')
+                    if vectorequiv is not None:
+                        self.fn_by_vectorequiv[vectorequiv][fname] = item
+                elif item.tag() == 'size':
+                    name = item.get_attr('name')
+                    self.size_by_name[name].append(item)
+                self.recurse(item.items[1:-1])
 
-def cut_item_lines(items, i):
-    cut_items = [items[i]]
-    del items[i]
-    if i < len(items) and isinstance(items[i], str) and items[i].isspace():
-        newline_pos = items[i].rfind('\n')
-        if newline_pos != -1:
-            cut_items.append(items[i][:(newline_pos + 1)])
-            items[i] = items[i][(newline_pos + 1):]
-            if items[i] == '':
-                del items[i]
-    if i > 0 and isinstance(items[i-1], str) and items[i-1].isspace():
-        newline_pos = items[i-1].find('\n')
-        if newline_pos != -1:
+    def move_params(self, src, dst):
+        for key, value in src.get_attr_list():
+            if key in ('name', 'type', 'padding'):
+                continue
+            elif key in ('client_only', 'count', 'counter', 'count_scale',
+                         'output', 'img_width', 'img_height', 'img_depth',
+                         'img_extent', 'img_xoff', 'img_yoff', 'img_zoff',
+                         'img_woff', 'img_format', 'img_type', 'img_target',
+                         'img_send_null', 'img_null_flag', 'img_pad_dimensions',
+                         'variable_param'):
+                src.unset_attr(key)
+                dst.set_attr(key, value)
+            else:
+                raise Exception(key)
+
+    def join_strings(self, items, i):
+        if 0 < i < len(items) and isinstance(items[i-1], str) and isinstance(items[i], str):
+            combined = items[i-1] + items[i]
+            items[i-1:i+1] = [combined]
+
+    def cut_item_lines(self, items, i):
+        cut_items = [items[i]]
+        del items[i]
+        if i < len(items) and isinstance(items[i], str) and items[i].isspace():
+            newline_pos = items[i].rfind('\n')
+            if newline_pos != -1:
+                cut_items.append(items[i][:(newline_pos + 1)])
+                items[i] = items[i][(newline_pos + 1):]
+                if items[i] == '':
+                    del items[i]
+        if i > 0 and isinstance(items[i-1], str) and items[i-1].isspace():
+            newline_pos = items[i-1].find('\n')
+            if newline_pos != -1:
+                if newline_pos + 1 != len(items[i-1]):
+                    cut_items.insert(0, items[i-1][(newline_pos + 1):])
+                    items[i-1] = items[i-1][:(newline_pos + 1)]
+                    if items[i-1] == '':
+                        del items[i-1]
+        self.join_strings(items, i)
+        return cut_items
+
+    def insert_lines(self, items, i, paste_items):
+        indentation = ''
+        if i > 0 and isinstance(items[i-1], str) and items[i-1].isspace():
+            newline_pos = items[i-1].rfind('\n')
             if newline_pos + 1 != len(items[i-1]):
-                cut_items.insert(0, items[i-1][(newline_pos + 1):])
+                indentation = items[i-1][(newline_pos + 1):]
                 items[i-1] = items[i-1][:(newline_pos + 1)]
                 if items[i-1] == '':
                     del items[i-1]
-    join_strings(items, i)
-    return cut_items
+                    i -= 1
+                items.insert(i, indentation)
+        items[i:i] = paste_items
+        self.join_strings(items, i + len(paste_items))
+        self.join_strings(items, i)
 
-def insert_lines(items, i, paste_items):
-    indentation = ''
-    if i > 0 and isinstance(items[i-1], str) and items[i-1].isspace():
-        newline_pos = items[i-1].rfind('\n')
-        if newline_pos + 1 != len(items[i-1]):
-            indentation = items[i-1][(newline_pos + 1):]
-            items[i-1] = items[i-1][:(newline_pos + 1)]
-            if items[i-1] == '':
-                del items[i-1]
-                i -= 1
-            items.insert(i, indentation)
-    items[i:i] = paste_items
-    join_strings(items, i + len(paste_items))
-    join_strings(items, i)
+    def move_glx(self, frm, to):
+        src_xml = self.fn_by_name[frm]
+        dst_xml = self.fn_by_name[to]
+        src_params = [item for item in src_xml.items if isinstance(item, Element) and item.tag() == 'param']
+        dst_params = [item for item in dst_xml.items if isinstance(item, Element) and item.tag() == 'param']
+        assert len(src_params) == len(dst_params)
+        for i in range(len(src_params)):
+            self.move_params(src_params[i], dst_params[i])
+        offset = src_xml.get_attr('offset')
+        if offset is not None:
+            dst_xml.set_attr('offset', offset)
+            src_xml.unset_attr('offset')
+        # Move GLX element, if present
+        for i in range(len(src_xml.items)):
+            if isinstance(src_xml.items[i], Element) and src_xml.items[i].tag() == 'glx':
+                cut_items = self.cut_item_lines(src_xml.items, i)
+                self.insert_lines(dst_xml.items, len(dst_xml.items) - 1, cut_items)
+                break
+        #print(str(src_xml))
+        #print(str(dst_xml))
 
-def move_glx(definitions, frm, to):
-    src_xml = definitions[frm]
-    dst_xml = definitions[to]
-    src_params = [item for item in src_xml.items if isinstance(item, Element) and item.tag() == 'param']
-    dst_params = [item for item in dst_xml.items if isinstance(item, Element) and item.tag() == 'param']
-    assert len(src_params) == len(dst_params)
-    for i in range(len(src_params)):
-        move_params(src_params[i], dst_params[i])
-    offset = src_xml.get_attr('offset')
-    if offset is not None:
-        dst_xml.set_attr('offset', offset)
-        src_xml.unset_attr('offset')
-    # Move GLX element, if present
-    for i in range(len(src_xml.items)):
-        if isinstance(src_xml.items[i], Element) and src_xml.items[i].tag() == 'glx':
-            cut_items = cut_item_lines(src_xml.items, i)
-            insert_lines(dst_xml.items, len(dst_xml.items) - 1, cut_items)
-            break
-    #print(str(src_xml))
-    #print(str(dst_xml))
+    def fix_mesa_name_and_exec(self, frm):
+        assert frm in self.fn_by_alias
+        for value in self.fn_by_alias[frm].values():
+            value.unset_attr('mesa_name')
+            if value.get_attr('exec') in ('es', 'loopback', 'check'):
+                value.unset_attr('exec')
 
-def fix_mesa_name_and_exec(by_alias, frm):
-    assert frm in by_alias
-    for value in by_alias[frm].values():
-        value.unset_attr('mesa_name')
-        if value.get_attr('exec') in ('es', 'loopback', 'check'):
-            value.unset_attr('exec')
+    def fix_aliases(self, frm, to):
+        assert frm != to
+        assert frm in self.fn_by_alias
+        assert to in self.fn_by_alias[frm]
+        for key, value in self.fn_by_alias[frm].items():
+            if key == to:
+                value.unset_attr('alias')
+            else:
+                value.set_attr('alias', to)
+            #print(value)
 
-def fix_aliases(by_alias, frm, to):
-    assert frm != to
-    assert frm in by_alias
-    assert to in by_alias[frm]
-    for key, value in by_alias[frm].items():
-        if key == to:
-            value.unset_attr('alias')
-        else:
-            value.set_attr('alias', to)
-        #print(value)
+    def fix_vectorequivs(self, frm, to):
+        if frm not in self.fn_by_vectorequiv:
+            return
+        for value in self.fn_by_vectorequiv[frm].values():
+            assert value.get_attr('vectorequiv') == frm
+            value.set_attr('vectorequiv', to)
 
-def fix_vectorequivs(by_vectorequiv, frm, to):
-    if frm not in by_vectorequiv:
-        return
-    for value in by_vectorequiv[frm].values():
-        assert value.get_attr('vectorequiv') == frm
-        value.set_attr('vectorequiv', to)
+    def change_c_identifiers(self, changes):
+        for filename, model in self.file_cache.items():
+            if isinstance(model, CFile):
+                for i in range(len(model.parsed)):
+                    if model.parsed[i] in changes:
+                        model.parsed[i] = changes[model.parsed[i]]
 
-def write_files(file_cache):
-    for filename, model in file_cache.items():
-        new_contents = ''.join(str(item) for item in model.parsed)
-        if new_contents != model.contents:
-            with open(filename, 'w', encoding='latin-1') as f:
-                f.write(new_contents)
-            model.contents = new_contents
-            print('Wrote {0}'.format(filename))
-
-def change_c_identifiers(file_cache, changes):
-    for filename, model in file_cache.items():
-        if isinstance(model, CFile):
-            for i in range(len(model.parsed)):
-                if model.parsed[i] in changes:
-                    model.parsed[i] = changes[model.parsed[i]]
+    def fix_sizes(self, frm, to):
+        if frm not in self.size_by_name:
+            return
+        for elem in self.size_by_name[frm]:
+            assert elem.get_attr('name') == frm
+            elem.set_attr('name', to)
 
 def describe_change(rename):
     junk, old_canonical, new_canonical, old_mesa_name, new_mesa_name = rename
@@ -366,7 +380,7 @@ def describe_change(rename):
         desc = 'Change aliasing for {0}'.format(new_canonical)
     return desc
 
-def do_batch(renames, file_cache, definitions_by_name, definitions_by_alias, definitions_by_vectorequiv):
+def do_batch(renames, file_cache, analysis):
     c_changes = {}
     for rename in renames:
         desc = describe_change(rename)
@@ -374,33 +388,34 @@ def do_batch(renames, file_cache, definitions_by_name, definitions_by_alias, def
         junk, old_canonical, new_canonical, old_mesa_name, new_mesa_name = rename
         if old_mesa_name != new_mesa_name:
             c_changes[old_mesa_name] = new_mesa_name
-            fix_mesa_name_and_exec(definitions_by_alias, old_canonical)
+            analysis.fix_mesa_name_and_exec(old_canonical)
         if old_canonical != new_canonical:
-            fix_aliases(definitions_by_alias, old_canonical, new_canonical)
-            fix_vectorequivs(definitions_by_vectorequiv, old_canonical, new_canonical)
-            move_glx(definitions_by_name, old_canonical, new_canonical)
+            analysis.fix_aliases(old_canonical, new_canonical)
+            analysis.fix_vectorequivs(old_canonical, new_canonical)
+            analysis.move_glx(old_canonical, new_canonical)
+            analysis.fix_sizes(old_canonical, new_canonical)
             for prefix in ('_glptr_', 'CALL_', 'GET_', 'SET_', '_gloffset_'):
                 c_changes[prefix + old_canonical] = prefix + new_canonical
     print('Renaming {0} functions in C/C++ code'.format(len(c_changes)))
-    change_c_identifiers(file_cache, c_changes)
+    analysis.change_c_identifiers(c_changes)
 
 
 def main(renames):
     root_dir = '/home/pberry/mesa'
 
-    file_cache = {}
+    file_cache = FileCache()
     print('Scanning')
-    recursive_read(root_dir, file_cache)
-    definitions_by_name, definitions_by_alias, definitions_by_vectorequiv = find_xml_func_definitions(file_cache)
+    file_cache.recursive_read(root_dir)
+    analysis = Analysis(file_cache)
     if BATCH_MODE:
-        do_batch(renames, file_cache, definitions_by_name, definitions_by_alias, definitions_by_vectorequiv)
-        write_files(file_cache)
+        do_batch(renames, file_cache, analysis)
+        file_cache.write_files()
     else:
         for rename in renames:
             desc = describe_change(rename)
             print('Preparing commit {0!r}'.format(desc))
-            do_batch([rename], file_cache, definitions_by_name, definitions_by_alias, definitions_by_vectorequiv)
-            write_files(file_cache)
+            do_batch([rename], file_cache, analysis)
+            file_cache.write_files()
             print('Committing')
             retcode = subprocess.call(['git', 'commit', '-a', '-m' + desc])
             if retcode != 0:
