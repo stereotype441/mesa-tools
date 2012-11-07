@@ -418,9 +418,9 @@ def do_batch(renames, file_cache, analysis):
         desc = describe_change(rename)
         print('XML: {0}'.format(desc))
         junk, old_canonical, new_canonical, old_mesa_name, new_mesa_name = rename
+        analysis.fix_mesa_name_and_exec(old_canonical)
         if old_mesa_name != new_mesa_name:
             c_changes[old_mesa_name] = new_mesa_name
-            analysis.fix_mesa_name_and_exec(old_canonical)
         if old_canonical != new_canonical:
             analysis.fix_aliases(old_canonical, new_canonical)
             analysis.fix_vectorequivs(old_canonical, new_canonical)
