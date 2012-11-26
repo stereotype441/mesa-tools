@@ -13,6 +13,7 @@ popd
 mkdir -p build
 cd build
 cmake \
+    -G Ninja \
     -DCMAKE_BUILD_TYPE=debug \
     -DCMAKE_C_FLAGS_DEBUG="-g -O0" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" \
