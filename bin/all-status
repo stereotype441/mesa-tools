@@ -1,12 +1,34 @@
-#!/bin/bash
-IFS=$'\n'
-DIRS=`find ~ -type d -name '.platform' -prune -o -name '.git' -print`
-for x in $DIRS; do
-    status="`cd "$x"; cd ..; git status -s -b`"
-    if [[ "$status" != "" ]]; then
-        printf "%-30s " "`cd "$x"; cd ..; pwd-nice`:"
-        for line in $status; do
-            echo "  $line"
-        done
-    fi
-done
+#!/usr/bin/env python3
+import os
+import os.path
+import stat
+import subprocess
+
+HOME_DIR = os.path.expanduser('~')
+
+def recurse_dir(path):
+    #print('Investigating {0!r}'.format(path))
+    dir_contents = sorted(os.listdir(path))
+    if '.git' in dir_contents:
+        status = subprocess.check_output(['git', 'status', '-s', '-b'], cwd = path, universal_newlines = True)
+        printable_path = path
+        if printable_path.startswith(HOME_DIR + '/'):
+            printable_path = '~' + printable_path[len(HOME_DIR):]
+        printable_path += ':'
+        if len(printable_path) < 30:
+            printable_path += ' '*(30 - len(printable_path))
+        lines = status.split('\n')
+        while len(lines) > 1 and lines[-1] == '':
+            del lines[-1]
+        print('{0} {1}'.format(printable_path, lines[0]))
+        for line in lines[1:]:
+            print('  ' + line)
+        return
+    for entry in dir_contents:
+        if entry in ('.platform', 'android', '.ccache', '.mozilla', 'patches', 'piglit-summary'):
+            continue
+        entry_path = os.path.join(path, entry)
+        if stat.S_ISDIR(os.lstat(entry_path).st_mode):
+            recurse_dir(entry_path)
+
+recurse_dir(HOME_DIR)
