@@ -3,6 +3,7 @@ import os
 import os.path
 import stat
 import subprocess
+import sys
 
 HOME_DIR = os.path.expanduser('~')
 
@@ -10,17 +11,19 @@ def recurse_dir(path):
     #print('Investigating {0!r}'.format(path))
     dir_contents = sorted(os.listdir(path))
     if '.git' in dir_contents:
-        status = subprocess.check_output(['git', 'status', '-s', '-b'], cwd = path, universal_newlines = True)
         printable_path = path
         if printable_path.startswith(HOME_DIR + '/'):
             printable_path = '~' + printable_path[len(HOME_DIR):]
         printable_path += ':'
         if len(printable_path) < 30:
             printable_path += ' '*(30 - len(printable_path))
+        sys.stdout.write(printable_path + ' ')
+        sys.stdout.flush()
+        status = subprocess.check_output(['git', 'status', '-s', '-b'], cwd = path, universal_newlines = True)
         lines = status.split('\n')
         while len(lines) > 1 and lines[-1] == '':
             del lines[-1]
-        print('{0} {1}'.format(printable_path, lines[0]))
+        print(lines[0])
         for line in lines[1:]:
             print('  ' + line)
         return
