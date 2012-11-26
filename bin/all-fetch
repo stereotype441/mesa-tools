@@ -1,11 +1,27 @@
-#!/bin/bash
-oldifs=$IFS
-IFS=$'\n'
-dirs=(`find ~ -type d -name '.platform' -prune -o -name '.git' -print`)
-IFS=$oldifs
-for x in "${dirs[@]}"; do
-    echo "`cd "$x"; cd ..; pwd-nice`:"
-    cd "$x"
-    cd ..
-    git fetch --all
-done
+#!/usr/bin/env python3
+import os
+import os.path
+import stat
+import subprocess
+import sys
+
+HOME_DIR = os.path.expanduser('~')
+
+def recurse_dir(path):
+    #print('Investigating {0!r}'.format(path))
+    dir_contents = sorted(os.listdir(path))
+    if '.git' in dir_contents:
+        printable_path = path
+        if printable_path.startswith(HOME_DIR + '/'):
+            printable_path = '~' + printable_path[len(HOME_DIR):]
+        print('{0}:'.format(printable_path))
+        subprocess.call(['git', 'fetch', '--all'], cwd = path, universal_newlines = True)
+        return
+    for entry in dir_contents:
+        if entry in ('.platform', 'android', '.ccache', '.mozilla', 'patches', 'piglit-summary'):
+            continue
+        entry_path = os.path.join(path, entry)
+        if stat.S_ISDIR(os.lstat(entry_path).st_mode):
+            recurse_dir(entry_path)
+
+recurse_dir(HOME_DIR)
