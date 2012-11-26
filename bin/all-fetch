@@ -18,7 +18,7 @@ def recurse_dir(path):
         subprocess.call(['git', 'fetch', '--all'], cwd = path, universal_newlines = True)
         return
     for entry in dir_contents:
-        if entry in ('.platform', 'android', '.ccache', '.mozilla', 'patches', 'piglit-summary'):
+        if entry in ('.platform', 'android', '.ccache', '.mozilla', 'patches', 'piglit-summary', 'intel-vpn'):
             continue
         entry_path = os.path.join(path, entry)
         if stat.S_ISDIR(os.lstat(entry_path).st_mode):
