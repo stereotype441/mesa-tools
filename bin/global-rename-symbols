@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import os.path
+import re
+
+C_IDENTIFIER = re.compile('[a-zA-Z_][a-zA-Z0-9_]*')
+
+class File(object):
+    def __init__(self, filename):
+        with open(filename, 'r', encoding='latin-1') as f:
+            self.contents = f.read()
+
+class CFile(File):
+    def __init__(self, filename):
+        File.__init__(self, filename)
+        pos = 0
+        tokens = []
+        while pos < len(self.contents):
+            match = C_IDENTIFIER.search(self.contents, pos)
+            if match == None:
+                tokens.append(self.contents[pos:])
+                break
+            tokens.append(self.contents[pos:match.start()])
+            tokens.append(self.contents[match.start():match.end()])
+            pos = match.end()
+        self.parsed = tokens
+
+class FileCache(dict):
+    def read_file(self, filename):
+        base, ext = os.path.splitext(filename)
+        ext = ext.lower()
+        if ext in ('.cpp', '.hpp', '.cc', '.hh', '.c', '.h'):
+            self[filename] = CFile(filename)
+
+    def recursive_read(self, filename):
+        if os.path.basename(filename) == '.git':
+            return
+        if os.path.islink(filename):
+            pass
+        elif os.path.isfile(filename):
+            self.read_file(filename)
+        elif os.path.isdir(filename):
+            for file in os.listdir(filename):
+                self.recursive_read(os.path.join(filename, file))
+
+    def write_files(self):
+        for filename, model in self.items():
+            new_contents = ''.join(str(item) for item in model.parsed)
+            if new_contents != model.contents:
+                with open(filename, 'w', encoding='latin-1') as f:
+                    f.write(new_contents)
+                model.contents = new_contents
+                print('Wrote {0}'.format(filename))
+
+def main():
+    old = sys.argv[1]
+    new = sys.argv[2]
+    root_dir = '/home/pberry/mesa'
+
+    file_cache = FileCache()
+    print('Scanning')
+    file_cache.recursive_read(root_dir)
+    print('Renaming')
+    for filename, model in file_cache.items():
+        if isinstance(model, CFile):
+            for i in range(len(model.parsed)):
+                if model.parsed[i] == old:
+                    model.parsed[i] = new
+    print('Writing changes')
+    file_cache.write_files()
+
+main()
