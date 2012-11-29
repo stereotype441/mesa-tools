@@ -45,12 +45,14 @@ def nice_time(timestamp):
     return dt.strftime('%Y%m%d-%H%M%S')
 
 def make_patches_from_mail_folder(folder_name, summary_data):
+    print 'Making patches from mail folder {0}'.format(folder_name)
     mbox_dir = os.path.join(os.path.expanduser('~/gmail'), folder_name)
     mbox = mailbox.Maildir(mbox_dir, create = False)
 
     stuff = []
     by_id = {}
 
+    print '  Gathering data from mailbox'.format(folder_name)
     for key in mbox.keys():
         msg = mbox[key]
         decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
@@ -69,6 +71,7 @@ def make_patches_from_mail_folder(folder_name, summary_data):
 
     stuff.sort()
 
+    print '  Creating patch files'.format(folder_name)
     for timestamp, key, subject, in_reply_to in stuff:
         if subject.find('[PATCH') == -1 or subject.lower().startswith('re'):
             continue
