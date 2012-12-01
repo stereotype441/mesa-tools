@@ -9,6 +9,7 @@ import datetime
 import email.utils
 import mailbox
 import os.path
+import json
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 
@@ -78,7 +79,7 @@ def make_patches_from_mail_folder(folder_name, summary_data):
 
         filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
         path = os.path.join(PATCHES_DIR, filename)
-        summary_data.append((timestamp, subject, path))
+        summary_data.append((timestamp, subject, path, key))
         if not os.path.exists(path):
             msg_str = mbox.get_string(key)
             with open(path, 'w') as f:
@@ -94,4 +95,10 @@ for folder_name in ['Mesa-dev', 'Piglit']:
 summary_data.sort()
 with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
     f.write(''.join('{0} {1!r}: {2!r}\n'.format(nice_time(timestamp), subject, path)
-                    for timestamp, subject, path in summary_data))
+                    for timestamp, subject, path, _ in summary_data))
+
+skip_info = {}
+for _, _, _, key in summary_data:
+    skip_info[key] = True
+with open(os.path.join(PATCHES_DIR, 'skip_info.json'), 'w') as f:
+    json.dump(skip_info, f)
