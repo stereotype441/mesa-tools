@@ -3,4 +3,5 @@ set -e
 cd ~/mesa
 git tag -d check || true
 git tag check `git-commit-working-tree`
-make check
+num_jobs=`getconf _NPROCESSORS_ONLN`
+make "-j$num_jobs" check
