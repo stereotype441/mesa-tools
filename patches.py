@@ -45,30 +45,32 @@ def nice_time(timestamp):
     dt = datetime.datetime.utcfromtimestamp(timestamp)
     return dt.strftime('%Y%m%d-%H%M%S')
 
-def make_patches_from_mail_folder(folder_name, summary_data):
+def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cache):
     print 'Making patches from mail folder {0}'.format(folder_name)
     mbox_dir = os.path.join(os.path.expanduser('~/gmail'), folder_name)
     mbox = mailbox.Maildir(mbox_dir, create = False)
 
     stuff = []
-    by_id = {}
 
     print '  Gathering data from mailbox'.format(folder_name)
     for key in mbox.keys():
-        msg = mbox[key]
-        decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
-        subject = ' '.join(decode_rfc2047_part(s, e) for s, e in decoded_subj)
+        if key in old_cache:
+            summary = old_cache[key]
+        else:
+            msg = mbox[key]
+            decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
+            subject = ' '.join(decode_rfc2047_part(s, e) for s, e in decoded_subj)
 
-        # TODO: email.utils.mktime_tz makes slight errors around daylight savings time.
-        timestamp = email.utils.mktime_tz(email.utils.parsedate_tz(msg['Date']))
+            # TODO: email.utils.mktime_tz makes slight errors around daylight savings time.
+            timestamp = email.utils.mktime_tz(email.utils.parsedate_tz(msg['Date']))
 
-        message_id = msg['Message-Id']
-        in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
+            message_id = msg['Message-Id']
+            in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
 
-        summary = (timestamp, key, subject, in_reply_to)
+            summary = (timestamp, key, subject, in_reply_to)
 
         stuff.append(summary)
-        by_id[message_id] = summary
+        new_cache[key] = summary
 
     stuff.sort()
 
@@ -87,9 +89,17 @@ def make_patches_from_mail_folder(folder_name, summary_data):
             print path
 
 
+old_cache = {}
+try:
+    with open(os.path.join(PATCHES_DIR, 'cache.json'), 'r') as f:
+        old_cache = json.load(f)
+except Exception, e:
+    print 'Non-fatal error loading old cache.json: {0}'.format(e)
+
+new_cache = {}
 summary_data = []
 for folder_name in ['Mesa-dev', 'Piglit']:
-    make_patches_from_mail_folder(folder_name, summary_data)
+    make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cache)
 
 
 summary_data.sort()
@@ -97,8 +107,5 @@ with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
     f.write(''.join('{0} {1!r}: {2!r}\n'.format(nice_time(timestamp), subject, path)
                     for timestamp, subject, path, _ in summary_data))
 
-skip_info = {}
-for _, _, _, key in summary_data:
-    skip_info[key] = True
-with open(os.path.join(PATCHES_DIR, 'skip_info.json'), 'w') as f:
-    json.dump(skip_info, f)
+with open(os.path.join(PATCHES_DIR, 'cache.json'), 'w') as f:
+    json.dump(new_cache, f)
