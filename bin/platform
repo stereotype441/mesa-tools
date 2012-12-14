@@ -64,11 +64,12 @@ def runcmds(cmds, env):
         exit(e.returncode)
 
 class Platform(object):
-    def __init__(self, name, parents, cconfcmds = None, binstcmds = None, srcdirs = ()):
+    def __init__(self, name, parents, cconfcmds = None, buildcmds = None, instcmds = None, srcdirs = ()):
         self.__name = name
         self.__parents = parents
         self.__cconfcmds = cconfcmds
-        self.__binstcmds = binstcmds
+        self.__buildcmds = buildcmds
+        self.__instcmds = instcmds
         self.__srcdirs = tuple(srcdirs)
 
     @property
@@ -111,11 +112,18 @@ class Platform(object):
         return env
 
     @property
-    def binstcmds(self):
-        if self.__binstcmds is None:
+    def buildcmds(self):
+        if self.__buildcmds is None:
             print "Don't know how to build platform {0}".format(self.__name)
             exit(1)
-        return self.__binstcmds
+        return self.__buildcmds
+
+    @property
+    def instcmds(self):
+        if self.__instcmds is None:
+            print "Don't know how to install platform {0}".format(self.__name)
+            exit(1)
+        return self.__instcmds
 
     @property
     def cconfcmds(self):
@@ -129,91 +137,113 @@ ALL_PLATFORMS = {
                     srcdirs = ['~/drm'],
                     parents = [],
                     cconfcmds = ['clean-drm', 'configure-drm'],
-                    binstcmds = ['build-drm', 'install-platform']),
+                    buildcmds = ['build-drm'],
+                    instcmds = ['install-platform']),
     'drm-32': Platform(name = 'drm-32',
                        srcdirs = ['~/drm'],
                        parents = [],
                        cconfcmds = ['clean-drm', 'configure-drm-32bit'],
-                       binstcmds = ['build-drm', 'install-platform']),
+                       buildcmds = ['build-drm'],
+                       instcmds = ['install-platform']),
     'git': Platform(name = 'git',
                     srcdirs = ['~/git'],
                     parents = [],
                     cconfcmds = ['clean-git', 'configure-git'],
-                    binstcmds = ['build-git', 'install-platform']),
+                    buildcmds = ['build-git'],
+                    instcmds = ['install-platform']),
     'git-test': Platform(name = 'git-test',
                          srcdirs = [],
                          parents = ['git'],
                          cconfcmds = [],
-                         binstcmds = []),
+                         buildcmds = [],
+                         instcmds = []),
     'glean-mesa': Platform(name = 'glean-mesa',
                            parents = ['glean-mesa', 'proto', 'drm', 'xcb-proto', 'libxcb'],
                            cconfcmds = ['clean-glean', 'configure-glean'],
-                           binstcmds = ['build-glean']),
+                           buildcmds = ['build-glean'],
+                           instcmds = []),
     'libxcb': Platform(name = 'libxcb',
                        srcdirs = ['~/xcb/libxcb'],
                        parents = ['xcb-proto'],
                        cconfcmds = ['clean-libxcb', 'configure-libxcb'],
-                       binstcmds = ['build-libxcb', 'install-platform']),
+                       buildcmds = ['build-libxcb'],
+                       instcmds = ['install-platform']),
     'libxcb-32': Platform(name = 'libxcb-32',
                           srcdirs = ['~/xcb/libxcb'],
                           parents = ['xcb-proto'],
                           cconfcmds = ['clean-libxcb', 'configure-libxcb-32bit'],
-                          binstcmds = ['build-libxcb', 'install-platform']),
+                          buildcmds = ['build-libxcb'],
+                          instcmds = ['install-platform']),
     'waffle': Platform(name = 'waffle',
                        srcdirs = ['~/waffle'],
                        parents = ['libxcb', 'xcb-proto'],
                        cconfcmds = ['clean-waffle', 'configure-waffle'],
-                       binstcmds = ['build-waffle', 'check-waffle', 'install-platform']),
-    'llvm-2.9': Platform(name = 'llvm-2.9', parents = [], binstcmds = ['build-llvm', 'install-llvm']),
+                       buildcmds = ['build-waffle'],
+                       instcmds = ['check-waffle', 'install-platform']),
+    'llvm-2.9': Platform(name = 'llvm-2.9',
+                         parents = [],
+                         buildcmds = ['build-llvm'],
+                         instcmds = ['install-llvm']),
     'mesa': Platform(name = 'mesa',
                      srcdirs = ['~/mesa'],
                      parents = ['proto', 'drm', 'xcb-proto', 'libxcb'],
                      cconfcmds = ['clean-mesa', 'configure-mesa'],
-                     binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
+                     buildcmds = ['build-mesa'],
+                     instcmds = ['check-mesa', 'install-platform']),
     'mesa-32': Platform(name = 'mesa-32',
                         srcdirs = ['~/mesa'],
                         parents = ['proto', 'drm-32', 'xcb-proto', 'libxcb-32'],
                         cconfcmds = ['clean-mesa', 'configure-mesa-32bit'],
-                        binstcmds = ['build-mesa', 'install-platform']), # Note: skipping check-mesa due to Fedora bug https://bugzilla.redhat.com/show_bug.cgi?id=771478
+                        buildcmds = ['build-mesa'],
+                        instcmds = ['install-platform']), # Note: skipping check-mesa due to Fedora bug https://bugzilla.redhat.com/show_bug.cgi?id=771478
     'mesa-gallium': Platform(name = 'mesa-gallium',
                              srcdirs = ['~/mesa'],
                              parents = ['proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb'],
                              cconfcmds = ['clean-mesa', 'configure-mesa-with-gallium'],
-                             binstcmds = ['build-mesa', 'check-mesa', 'install-platform']),
+                             buildcmds = ['build-mesa'],
+                             instcmds = ['check-mesa', 'install-platform']),
     'oglc-mesa': Platform(name = 'oglc-mesa',
                           parents = ['oglc-mesa', 'mesa', 'proto', 'drm', 'xcb-proto', 'libxcb'],
                           cconfcmds = ['clean-oglc', 'configure-oglc'],
-                          binstcmds = ['build-oglc', 'install-oglc']),
+                          buildcmds = ['build-oglc'],
+                          instcmds = ['install-oglc']),
     'oglc-mesa-32': Platform(name = 'oglc-mesa-32',
                           parents = ['oglc-mesa-32', 'mesa-32', 'proto', 'drm-32', 'xcb-proto', 'libxcb-32'],
                           cconfcmds = ['clean-oglc', 'configure-oglc'],
-                          binstcmds = ['build-oglc-32', 'install-oglc-32']),
+                          buildcmds = ['build-oglc-32'],
+                             instcmds = ['install-oglc-32']),
     'piglit-gallium': Platform(name = 'piglit-gallium',
                                parents = ['piglit-gallium', 'mesa-gallium', 'proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb', 'waffle'],
                                cconfcmds = ['clean-piglit', 'configure-piglit'],
-                               binstcmds = ['build-piglit', 'install-piglit']),
+                               buildcmds = ['build-piglit'],
+                               instcmds = ['install-piglit']),
     'piglit-mesa': Platform(name = 'piglit-mesa',
                             parents = ['piglit-mesa', 'mesa', 'proto', 'drm', 'xcb-proto', 'libxcb', 'waffle'],
                             cconfcmds = ['clean-piglit', 'configure-piglit'],
-                            binstcmds = ['build-piglit', 'install-piglit']),
+                            buildcmds = ['build-piglit'],
+                            instcmds = ['install-piglit']),
     'piglit-mesa-32': Platform(name = 'piglit-mesa-32',
                                parents = ['piglit-mesa-32', 'mesa-32', 'proto', 'drm-32', 'xcb-proto', 'libxcb-32'],
                                cconfcmds = ['clean-piglit', 'configure-piglit-32bit'],
-                               binstcmds = ['build-piglit', 'install-piglit']),
+                               buildcmds = ['build-piglit'],
+                               instcmds = ['install-piglit']),
     'piglit-stock': Platform(name = 'piglit-stock',
                              parents = ['piglit-stock'],
                              cconfcmds = ['clean-piglit', 'configure-piglit'],
-                             binstcmds = ['build-piglit', 'install-piglit']),
+                             buildcmds = ['build-piglit'],
+                             instcmds = ['install-piglit']),
     'proto': Platform(name = 'proto',
                       srcdirs = ['~/dri2proto', '~/glproto'],
                       parents = [],
                       cconfcmds = ['clean-proto', 'configure-proto'],
-                      binstcmds = ['build-proto', 'install-platform']),
+                      buildcmds = ['build-proto'],
+                      instcmds = ['install-platform']),
     'xcb-proto': Platform(name = 'xcb-proto',
                           srcdirs = ['~/xcb/proto'],
                           parents = [],
                           cconfcmds = ['clean-xcb-proto', 'configure-xcb-proto'],
-                          binstcmds = ['build-xcb-proto', 'install-platform']),
+                          buildcmds = ['build-xcb-proto'],
+                          instcmds = ['install-platform']),
 }
 
 def get_platform(platform_name):
@@ -286,7 +316,7 @@ def main():
         if nargs != 1:
             usage()
         get_current_platform()
-    elif cmd in ('binst', 'cbinst'):
+    elif cmd in ('binst', 'cbinst', 'build'):
         if nargs == 1:
             platform = get_current_platform()
             env = os.environ
@@ -297,10 +327,12 @@ def main():
             env = platform.setup_env()
         else:
             usage()
-        if cmd == 'binst':
-            cmds = platform.binstcmds
+        if cmd == 'build':
+            cmds = platform.buildcmds
+        elif cmd == 'binst':
+            cmds = platform.buildcmds + platform.instcmds
         else:
-            cmds = platform.cconfcmds + platform.binstcmds
+            cmds = platform.cconfcmds + platform.buildcmds + platform.instcmds
         runcmds(cmds, env)
     elif cmd == 'cbrec':
         if nargs != 2:
@@ -310,7 +342,7 @@ def main():
             print '*** clean/configure/build/install {0} ***'.format(platform_name)
             platform = get_platform(platform_name)
             env = platform.setup_env()
-            cmds = platform.cconfcmds + platform.binstcmds
+            cmds = platform.cconfcmds + platform.buildcmds + platform.instcmds
             runcmds(cmds, env)
     else:
         usage()
