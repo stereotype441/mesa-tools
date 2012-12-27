@@ -6,14 +6,14 @@ git tag -d configure || true
 git tag configure `git-commit-working-tree`
 CFLAGS="-O0 -m32 $CFLAGS" CXXFLAGS="-O0 -m32 $CXXFLAGS" ./autogen.sh \
     --with-gallium-drivers= \
-    --disable-gles1 \
+    --enable-gles1 \
     --disable-glut \
     --enable-debug \
     --enable-egl \
-    --enable-egl \
     --enable-gles2 \
-    --enable-selinux \
     --enable-texture-float \
+    --enable-shared-glapi \
+    --enable-glx-tls \
     --enable-32-bit \
     --disable-64-bit \
     "--prefix=$PLATFORM_INSTALL_DIR" \
