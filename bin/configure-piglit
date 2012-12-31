@@ -17,6 +17,9 @@ cmake \
     -DCMAKE_BUILD_TYPE=debug \
     -DCMAKE_C_FLAGS_DEBUG="-g -O0" \
     -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" \
+    -DPIGLIT_BUILD_GLES1_TESTS=ON \
+    -DPIGLIT_BUILD_GLES2_TESTS=ON \
+    -DPIGLIT_BUILD_GLES3_TESTS=ON \
     "-DCMAKE_INSTALL_PREFIX=$PLATFORM_INSTALL_DIR" \
     ../source
 cd "$build_dir/source"
