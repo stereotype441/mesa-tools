@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+platform checkactive
+build_dir="$PLATFORM_ROOT_DIR/piglit"
+mkdir -p "$build_dir"
+cd "$build_dir"
+rm -rf build
+mkdir -p source
+pushd source
+git-copy-working-tree "$HOME/piglit"
+git clean -f -x
+popd
+mkdir -p build
+cd build
+cmake \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=debug \
+    -DCMAKE_C_FLAGS_DEBUG="-g -O0" \
+    -DCMAKE_CXX_FLAGS_DEBUG="-g -O0" \
+    "-DCMAKE_INSTALL_PREFIX=$PLATFORM_INSTALL_DIR" \
+    ../source
+cd "$build_dir/source"
+git tag -f configure
