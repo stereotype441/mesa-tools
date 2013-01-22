@@ -10,8 +10,10 @@ import email.utils
 import mailbox
 import os.path
 import json
+import re
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
+PATCH_REGEXP = re.compile(r'\[[A-Z ]*PATCH')
 
 PATCHES_DIR = os.path.expanduser('~/patches')
 
@@ -76,7 +78,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
 
     print '  Creating patch files'.format(folder_name)
     for timestamp, key, subject, in_reply_to in stuff:
-        if subject.find('[PATCH') == -1 or subject.lower().startswith('re'):
+        if not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
             continue
 
         filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
@@ -104,7 +106,7 @@ for folder_name in ['Mesa-dev', 'Piglit']:
 
 summary_data.sort()
 with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
-    f.write(''.join('{0} {1!r}: {2!r}\n'.format(nice_time(timestamp), subject, path)
+    f.write(''.join('git am -3 {2!r} # {0} {1!r}\n'.format(nice_time(timestamp), subject, path)
                     for timestamp, subject, path, _ in summary_data))
 
 with open(os.path.join(PATCHES_DIR, 'cache.json'), 'w') as f:
