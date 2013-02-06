@@ -18,7 +18,7 @@ platform checkactive
 cd "$PLATFORM_ROOT_DIR/piglit"
 result_parent_dir=$HOME/piglit-results
 mkdir -p $result_parent_dir
-piglit_source_dir=$PLATFORM_ROOT_DIR/piglit/source
+piglit_source_dir=$HOME/piglit
 export PIGLIT_BUILD_DIR=$PLATFORM_ROOT_DIR/piglit/build
 timestamp=$(date -u +%Y-%m-%d-%H%M%S)
 long_name=$PLATFORM_NAME-$timestamp-$short_name

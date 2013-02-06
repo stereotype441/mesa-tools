@@ -17,7 +17,7 @@ results_dir=$HOME/piglit-results
 summary_dir=$HOME/piglit-summary
 rm -rf "$summary_dir"
 mkdir -p "$summary_dir"
-cd "$PLATFORM_ROOT_DIR/piglit/source"
+cd ~/piglit
 for arg in "$@"; do
     find $results_dir -type f | sort | grep "/$arg"
 done | xargs ./piglit-summary-html.py --overwrite "$summary_dir"

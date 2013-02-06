@@ -1,12 +1,9 @@
 #!/bin/bash
 set -e
 platform checkactive
-cd "$PLATFORM_ROOT_DIR/piglit/source"
-git-copy-working-tree "$HOME/piglit"
+cd ~/piglit
 git tag -d build || true
+git tag build `git-commit-working-tree`
 cd "$PLATFORM_ROOT_DIR/piglit/build"
-num_jobs=`getconf _NPROCESSORS_ONLN`
 export PIGLIT_BUILD_DIR=$PLATFORM_ROOT_DIR/piglit/build
 ninja
-cd "$PLATFORM_ROOT_DIR/piglit/source"
-git tag build
