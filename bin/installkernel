@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+if [ ! -f "$3" ]; then
+    echo "Bad arguments.  Invoke using 'make install' from kernel dir."
+    exit 1
+fi
+
+sudo cp -v "$2" "$4/vmlinuz-Paul"
+sudo mkinitcpio -k "$1" -g "$4/initramfs-Paul.img"
+sudo cp "$3" "$4/System.map-Paul"
+sudo grub-mkconfig -o "$4/grub/grub.cfg"
