@@ -19,6 +19,6 @@ rm -rf "$summary_dir"
 mkdir -p "$summary_dir"
 cd ~/piglit
 for arg in "$@"; do
-    find $results_dir -type f | sort | grep "/$arg"
+    find $results_dir -type f | sort | grep "/$arg\$"
 done | xargs ./piglit-summary-html.py --overwrite "$summary_dir"
 gnome-open "$summary_dir/index.html"
