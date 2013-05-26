@@ -14,6 +14,7 @@ import re
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 PATCH_REGEXP = re.compile(r'\[[A-Z ]*PATCH')
+CACHE_VERSION = 1
 
 PATCHES_DIR = os.path.expanduser('~/patches')
 
@@ -56,8 +57,8 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
 
     print '  Gathering data from mailbox'.format(folder_name)
     for key in mbox.keys():
-        if key in old_cache:
-            summary = old_cache[key]
+        if key in old_cache['msgs']:
+            summary = old_cache['msgs'][key]
         else:
             msg = mbox[key]
             decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
@@ -72,7 +73,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             summary = (timestamp, key, subject, in_reply_to)
 
         stuff.append(summary)
-        new_cache[key] = summary
+        new_cache['msgs'][key] = summary
 
     stuff.sort()
 
@@ -91,14 +92,18 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             print path
 
 
-old_cache = {}
+old_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
 try:
     with open(os.path.join(PATCHES_DIR, 'cache.json'), 'r') as f:
-        old_cache = json.load(f)
+        cache = json.load(f)
+    if 'cache_version' in cache and cache['cache_version'] == CACHE_VERSION:
+        old_cache = cache
+    else:
+        print 'cache.json is out of date.  Rebuilding.'
 except Exception, e:
     print 'Non-fatal error loading old cache.json: {0}'.format(e)
 
-new_cache = {}
+new_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
 summary_data = []
 for folder_name in ['Mesa-dev', 'Piglit']:
     make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cache)
