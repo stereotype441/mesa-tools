@@ -14,7 +14,7 @@ import re
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 PATCH_REGEXP = re.compile(r'\[[A-Z ]*PATCH')
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 PATCHES_DIR = os.path.expanduser('~/patches')
 
@@ -70,7 +70,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             message_id = msg['Message-Id']
             in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
 
-            summary = (timestamp, key, subject, in_reply_to)
+            summary = (timestamp, key, subject, in_reply_to, message_id)
 
         stuff.append(summary)
         new_cache['msgs'][key] = summary
@@ -78,7 +78,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
     stuff.sort()
 
     print '  Creating patch files'.format(folder_name)
-    for timestamp, key, subject, in_reply_to in stuff:
+    for timestamp, key, subject, in_reply_to, message_id in stuff:
         if not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
             continue
 
