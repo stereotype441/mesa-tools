@@ -4,6 +4,7 @@
 # It assumes that offlineimap has been used to download the mailing
 # list messages to ~/gmail.
 
+import collections
 import cStringIO
 import datetime
 import email.utils
@@ -92,6 +93,24 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             print path
 
 
+def output_reply_tree(cache):
+    with open(os.path.join(PATCHES_DIR, 'replies.txt'), 'w') as f:
+        msg_to_reply_map = collections.defaultdict(list)
+        for key in cache['msgs']:
+            timestamp, key, subject, in_reply_to, message_id = cache['msgs'][key]
+            msg_to_reply_map[in_reply_to].append((timestamp, message_id, subject))
+        already_printed_message_ids = set()
+        def dump_tree(prefix, message_id):
+            for timestamp, reply_id, subject in sorted(msg_to_reply_map[message_id]):
+                f.write(prefix + '- ' + subject.encode('unicode_escape') + '\n')
+                if reply_id in already_printed_message_ids:
+                    f.write(prefix + '  ...\n')
+                else:
+                    already_printed_message_ids.add(reply_id)
+                    dump_tree(prefix + '  ', reply_id)
+        dump_tree('', None)
+
+
 old_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
 try:
     with open(os.path.join(PATCHES_DIR, 'cache.json'), 'r') as f:
@@ -113,6 +132,8 @@ summary_data.sort()
 with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
     f.write(''.join('git am -3 {2!r} # {0} {1!r}\n'.format(nice_time(timestamp), subject, path)
                     for timestamp, subject, path, _ in summary_data))
+
+output_reply_tree(new_cache)
 
 with open(os.path.join(PATCHES_DIR, 'cache.json'), 'w') as f:
     json.dump(new_cache, f)
