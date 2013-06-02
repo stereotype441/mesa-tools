@@ -1,0 +1,5 @@
+#!/bin/bash
+PIGLIT_TEST="/home/pberry/.platform/piglit-mesa/piglit/build/bin/arb_fragment_program-sparse-samplers -auto -fbo"
+platform binst mesa || platform cbinst mesa || exit 125
+bash -c "platform using piglit-mesa $PIGLIT_TEST" || exit 1
+exit 0
