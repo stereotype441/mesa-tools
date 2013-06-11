@@ -279,9 +279,10 @@ def iter_type_and_bases(typ):
     while types_to_search:
         typ = types_to_search.pop()
         yield typ
-        for f in typ.fields():
-            if f.is_base_class:
-                types_to_search.append(f.type)
+        if typ.code == gdb.TYPE_CODE_STRUCT:
+            for f in typ.fields():
+                if f.is_base_class:
+                    types_to_search.append(f.type)
 
 def find_vptr(value):
     for typ in iter_type_and_bases(value.type.unqualified()):
