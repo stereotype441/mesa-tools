@@ -46,6 +46,9 @@ while (( $# != 0 )); do
         "tomg")
             REVIEWER='Tom Gall <tom.gall@linaro.org>'
             ;;
+        "fabian")
+            REVIEWER='Fabian Bieler <fabianbieler@fastmail.fm>'
+            ;;
         *)
             echo "Unknown reviewer: $1"
             exit 1
