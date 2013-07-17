@@ -28,6 +28,9 @@ while (( $# != 0 )); do
         "ian")
             REVIEWER='Ian Romanick <ian.d.romanick@intel.com>'
             ;;
+        "idr")
+            REVIEWER='Ian Romanick <ian.d.romanick@intel.com>'
+            ;;
         "jordan")
             REVIEWER='Jordan Justen <jordan.l.justen@intel.com>'
             ;;
