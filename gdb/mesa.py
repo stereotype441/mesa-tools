@@ -431,11 +431,9 @@ def decode_ir_constant(x):
     ir_type = x['type']
     glsl_base_type = str(ir_type['base_type'])
     if glsl_base_type == 'GLSL_TYPE_ARRAY':
-        TODO("test me")
         constant_value = tuple(
             x['array_elements'][i] for i in xrange(int(ir_type['length'])))
     elif glsl_base_type == 'GLSL_TYPE_STRUCT':
-        TODO("test me")
         components = list(iter_exec_list(x['components']))
         constant_value = tuple(
             (ir_type['fields']['structure'][i]['name'].string(), components[i])
