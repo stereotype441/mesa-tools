@@ -1,3 +1,4 @@
+# coding=utf8
 # This script generates a ~/patches dir containing all patches from
 # the mailing lists.
 #
@@ -15,7 +16,38 @@ import re
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 PATCH_REGEXP = re.compile(r'\[[A-Z ]*PATCH')
-CACHE_VERSION = 5
+CACHE_VERSION = 7
+KNOWN_EMAILS = {
+    'maraeo@gmail.com': u'Marek Olšák',
+    'sroland@vmware.com': 'Roland Scheidegger',
+    'ville.syrjala@linux.intel.com': u'Ville Syrjälä',
+    'bugzilla-daemon@freedesktop.org': '(bugzilla)',
+    'jfonseca@vmware.com': u'José Fonseca',
+    'alexdeucher@gmail.com': 'Alex Deucher',
+    'junyan.he@linux.intel.com': 'Junyan He',
+    'j.glisse@gmail.com': 'Jerome Glisse',
+    'chad.versace@linux.intel.com': 'Chad Versace',
+    'groleo@gmail.com': 'Adrian Marius Negreanu',
+    'Ritvik_Sharma@Dell.com': 'Ritvik Sharma',
+    'piglit-bounces@lists.freedesktop.org': '(bounce)',
+    'Dmitry@freedesktop.org': 'Dmitry Cherkassov',
+    'tom@stellard.net': 'Tom Stellard',
+    'tstellar@gmail.com': 'Tom Stellard',
+    'oliver.mcfadden@linux.intel.com': 'Oliver McFadden',
+    'anuj.phogat@gmail.com': 'Anuj Phogat',
+    'jbenton@vmware.com': 'James Benton',
+    'zhiwen.wu@linux.intel.com': 'Alex Wu',
+    'mandeep.baines@gmail.com': 'Mandeep Singh Baines',
+    'jose.r.fonseca@gmail.com': u'José Fonseca',
+    'zhigang.gong@linux.intel.com': 'Zhigang Gong',
+    'juan.j.zhao@linux.intel.com': 'Juan Zhao',
+    'kallisti5@unixzen.com': 'Alexander von Gluck IV',
+    'christoph@bumiller.com': 'Christoph Bumiller',
+    'tfogal@sci.utah.edu': 'Tom Fogal',
+    'deathsimple@vodafone.de': u'Christian König',
+    'younes.m@gmail.com': 'Younes Manton',
+    'tapani.palli@intel.com': u'Tapani Pälli',
+}
 
 PATCHES_DIR = os.path.expanduser('~/patches')
 
@@ -28,6 +60,10 @@ def decode_rfc2047_part(s, encoding):
     if encoding is None or encoding in ['y', 'n', 'a', 'j']:
         return s
     return s.decode(encoding)
+
+def decode_header(header):
+    parts = email.header.decode_header(header.replace('\n', ''))
+    return ' '.join(decode_rfc2047_part(s, e) for s, e in parts)
 
 def safe_subject(subject):
     while True:
@@ -97,18 +133,18 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             summary = old_cache['msgs'][key]
         else:
             msg = mbox[key]
-            decoded_subj = email.header.decode_header(msg['Subject'].replace('\n', ''))
-            subject = ' '.join(decode_rfc2047_part(s, e) for s, e in decoded_subj)
+            subject = decode_header(msg['Subject'])
 
             # TODO: email.utils.mktime_tz makes slight errors around daylight savings time.
             timestamp = email.utils.mktime_tz(email.utils.parsedate_tz(msg['Date']))
 
-            message_id = msg['Message-Id']
-            in_reply_to = msg['In-Reply-To'].split()[0] if 'In-Reply-To' in msg else None
+            message_id = decode_header(msg['Message-Id'])
+            in_reply_to = decode_header(msg['In-Reply-To']).split()[0] if 'In-Reply-To' in msg else None
 
             looks_like_patch = guess_if_patch(subject, mbox.get_string(key))
+            sender = decode_header(msg['From'])
 
-            summary = (timestamp, key, subject, in_reply_to, message_id, looks_like_patch)
+            summary = (timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender)
 
         stuff.append(summary)
         new_cache['msgs'][key] = summary
@@ -116,7 +152,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
     stuff.sort()
 
     print '  Creating patch files'.format(folder_name)
-    for timestamp, key, subject, in_reply_to, message_id, looks_like_patch in stuff:
+    for timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender in stuff:
         if not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
             continue
 
@@ -130,28 +166,42 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             print path
 
 
+def short_sender(sender):
+    NAME_WIDTH = 16
+    real, addr = email.utils.parseaddr(sender)
+    if addr in KNOWN_EMAILS:
+        name = KNOWN_EMAILS[addr]
+    elif real:
+        name = real
+    else:
+        name = addr
+    name += ' ' * NAME_WIDTH
+    return name[0:NAME_WIDTH]
+
+
 def output_reply_tree(cache):
     with open(os.path.join(PATCHES_DIR, 'replies.txt'), 'w') as f:
         msg_to_reply_map = collections.defaultdict(list)
         for key in cache['msgs']:
-            timestamp, key, subject, in_reply_to, message_id, looks_like_patch = cache['msgs'][key]
-            msg_to_reply_map[in_reply_to].append((timestamp, message_id, subject, looks_like_patch))
+            timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender = cache['msgs'][key]
+            msg_to_reply_map[in_reply_to].append((timestamp, message_id, subject, looks_like_patch, sender))
         already_printed_message_ids = set()
         def dump_tree(prefix, message_id):
-            for timestamp, reply_id, subject, looks_like_patch in sorted(msg_to_reply_map[message_id]):
+            for timestamp, reply_id, subject, looks_like_patch, sender in sorted(msg_to_reply_map[message_id]):
                 if looks_like_patch:
                     tickmark = '*'
                 elif not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
                     tickmark = 'x'
                 else:
                     tickmark = '-'
-                f.write(prefix + tickmark + ' ' + subject.encode('unicode_escape') + '\n')
+                f.write(nice_time(timestamp) + ' ' + short_sender(sender).encode('utf8') + prefix + tickmark + ' ' +
+                        subject.encode('unicode_escape') + '\n')
                 if reply_id in already_printed_message_ids:
                     f.write(prefix + '  ...\n')
                 else:
                     already_printed_message_ids.add(reply_id)
                     dump_tree(prefix + '  ', reply_id)
-        dump_tree('', None)
+        dump_tree(' ', None)
 
 
 old_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
