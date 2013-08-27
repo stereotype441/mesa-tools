@@ -16,7 +16,7 @@ import re
 
 SAFE_SUBJECT_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz'
 PATCH_REGEXP = re.compile(r'\[[A-Z ]*PATCH')
-CACHE_VERSION = 7
+CACHE_VERSION = 9
 KNOWN_EMAILS = {
     'maraeo@gmail.com': u'Marek Olšák',
     'sroland@vmware.com': 'Roland Scheidegger',
@@ -58,7 +58,11 @@ except OSError:
 
 
 MessageInfo = collections.namedtuple('MessageInfo', (
-    'timestamp', 'key', 'subject', 'in_reply_to', 'message_id', 'looks_like_patch', 'sender'))
+    'timestamp', 'key', 'subject', 'in_reply_to', 'message_id', 'analysis', 'sender'))
+
+
+PatchAnalysis = collections.namedtuple('PatchAnalysis', (
+    'diffs_found',))
 
 
 def decode_rfc2047_part(s, encoding):
@@ -91,7 +95,7 @@ def nice_time(timestamp):
     return dt.strftime('%Y%m%d-%H%M%S')
 
 
-def guess_if_patch(subject, data):
+def analyze_patch(subject, data):
     # TODO: debug [Piglit] [PATCH 1/3] piglit util: new functions piglit_program_pipeline_check_status/quiet
     # TODO: handle multipart messages, e.g. [Piglit] [PATCH] Check for glsl before compiling a shader.
     # TODO: handle renames, e.g. [Piglit] [PATCH 4/8] move variable-index-read.sh and variable-index-write.sh to generated_tests
@@ -101,7 +105,7 @@ def guess_if_patch(subject, data):
     m = email.message_from_string(data)
     if m.is_multipart():
         print('Multipart message: {0!r}'.format(subject))
-        return False
+        return PatchAnalysis(False)
     data = m.get_payload(None, True)
     state = 0
     diffs_found = False
@@ -122,7 +126,7 @@ def guess_if_patch(subject, data):
                 pass
             else:
                 state = 1
-    return diffs_found
+    return PatchAnalysis(diffs_found)
 
 
 def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cache):
@@ -146,10 +150,10 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             message_id = decode_header(msg['Message-Id'])
             in_reply_to = decode_header(msg['In-Reply-To']).split()[0] if 'In-Reply-To' in msg else None
 
-            looks_like_patch = guess_if_patch(subject, mbox.get_string(key))
+            analysis = analyze_patch(subject, mbox.get_string(key))
             sender = decode_header(msg['From'])
 
-            summary = MessageInfo(timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender)
+            summary = MessageInfo(timestamp, key, subject, in_reply_to, message_id, analysis, sender)
 
         stuff.append(summary)
         new_cache['msgs'][key] = summary
@@ -189,11 +193,11 @@ def output_reply_tree(cache):
         msg_to_reply_map = collections.defaultdict(list)
         for key in cache['msgs']:
             msg_info = cache['msgs'][key]
-            msg_to_reply_map[msg_info.in_reply_to].append((msg_info.timestamp, msg_info.message_id, msg_info.subject, msg_info.looks_like_patch, msg_info.sender))
+            msg_to_reply_map[msg_info.in_reply_to].append((msg_info.timestamp, msg_info.message_id, msg_info.subject, msg_info.analysis, msg_info.sender))
         already_printed_message_ids = set()
         def dump_tree(prefix, message_id):
-            for timestamp, reply_id, subject, looks_like_patch, sender in sorted(msg_to_reply_map[message_id]):
-                if looks_like_patch:
+            for timestamp, reply_id, subject, analysis, sender in sorted(msg_to_reply_map[message_id]):
+                if analysis.diffs_found:
                     tickmark = '*'
                 elif not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
                     tickmark = 'x'
@@ -212,7 +216,9 @@ def output_reply_tree(cache):
 def reconstitute_cache(cache):
     msgs = cache['msgs']
     for key in msgs:
-        msgs[key] = MessageInfo(*msgs[key])
+        timestamp, key, subject, in_reply_to, message_id, analysis, sender = msgs[key]
+        analysis = PatchAnalysis(*analysis)
+        msgs[key] = MessageInfo(timestamp, key, subject, in_reply_to, message_id, analysis, sender)
 
 
 old_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
@@ -241,4 +247,4 @@ with open(os.path.join(PATCHES_DIR, 'summary.txt'), 'w') as f:
 output_reply_tree(new_cache)
 
 with open(os.path.join(PATCHES_DIR, 'cache.json'), 'w') as f:
-    json.dump(new_cache, f)
+    json.dump(new_cache, f, indent=2)
