@@ -56,6 +56,11 @@ try:
 except OSError:
     pass
 
+
+MessageInfo = collections.namedtuple('MessageInfo', (
+    'timestamp', 'key', 'subject', 'in_reply_to', 'message_id', 'looks_like_patch', 'sender'))
+
+
 def decode_rfc2047_part(s, encoding):
     if encoding is None or encoding in ['y', 'n', 'a', 'j']:
         return s
@@ -144,7 +149,7 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
             looks_like_patch = guess_if_patch(subject, mbox.get_string(key))
             sender = decode_header(msg['From'])
 
-            summary = (timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender)
+            summary = MessageInfo(timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender)
 
         stuff.append(summary)
         new_cache['msgs'][key] = summary
@@ -152,15 +157,15 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
     stuff.sort()
 
     print '  Creating patch files'.format(folder_name)
-    for timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender in stuff:
-        if not PATCH_REGEXP.search(subject) or subject.lower().startswith('re'):
+    for msg_info in stuff:
+        if not PATCH_REGEXP.search(msg_info.subject) or msg_info.subject.lower().startswith('re'):
             continue
 
-        filename = '{0}-{1}.patch'.format(nice_time(timestamp), safe_subject(subject)[:40])
+        filename = '{0}-{1}.patch'.format(nice_time(msg_info.timestamp), safe_subject(msg_info.subject)[:40])
         path = os.path.join(PATCHES_DIR, filename)
-        summary_data.append((timestamp, subject, path, key))
+        summary_data.append((msg_info.timestamp, msg_info.subject, path, msg_info.key))
         if not os.path.exists(path):
-            msg_str = mbox.get_string(key)
+            msg_str = mbox.get_string(msg_info.key)
             with open(path, 'w') as f:
                 f.write(msg_str)
             print path
@@ -183,8 +188,8 @@ def output_reply_tree(cache):
     with open(os.path.join(PATCHES_DIR, 'replies.txt'), 'w') as f:
         msg_to_reply_map = collections.defaultdict(list)
         for key in cache['msgs']:
-            timestamp, key, subject, in_reply_to, message_id, looks_like_patch, sender = cache['msgs'][key]
-            msg_to_reply_map[in_reply_to].append((timestamp, message_id, subject, looks_like_patch, sender))
+            msg_info = cache['msgs'][key]
+            msg_to_reply_map[msg_info.in_reply_to].append((msg_info.timestamp, msg_info.message_id, msg_info.subject, msg_info.looks_like_patch, msg_info.sender))
         already_printed_message_ids = set()
         def dump_tree(prefix, message_id):
             for timestamp, reply_id, subject, looks_like_patch, sender in sorted(msg_to_reply_map[message_id]):
@@ -204,12 +209,19 @@ def output_reply_tree(cache):
         dump_tree(' ', None)
 
 
+def reconstitute_cache(cache):
+    msgs = cache['msgs']
+    for key in msgs:
+        msgs[key] = MessageInfo(*msgs[key])
+
+
 old_cache = {'cache_version': CACHE_VERSION, 'msgs': {}}
 try:
     with open(os.path.join(PATCHES_DIR, 'cache.json'), 'r') as f:
         cache = json.load(f)
     if 'cache_version' in cache and cache['cache_version'] == CACHE_VERSION:
         old_cache = cache
+        reconstitute_cache(old_cache)
     else:
         print 'cache.json is out of date.  Rebuilding.'
 except Exception, e:
