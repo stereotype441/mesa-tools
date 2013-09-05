@@ -65,11 +65,12 @@ def runcmds(cmds, env):
         exit(e.returncode)
 
 class Platform(object):
-    def __init__(self, name, parents, cconfcmds = None, buildcmds = None, instcmds = None, srcdirs = ()):
+    def __init__(self, name, parents, cconfcmds = None, buildcmds = None, checkcmds = None, instcmds = None, srcdirs = ()):
         self.__name = name
         self.__parents = parents
         self.__cconfcmds = cconfcmds
         self.__buildcmds = buildcmds
+        self.__checkcmds = checkcmds
         self.__instcmds = instcmds
         self.__srcdirs = tuple(srcdirs)
 
@@ -119,6 +120,12 @@ class Platform(object):
             print "Don't know how to build platform {0}".format(self.__name)
             exit(1)
         return self.__buildcmds
+
+    @property
+    def checkcmds(self):
+        if self.__checkcmds is None:
+            return []
+        return self.__checkcmds
 
     @property
     def instcmds(self):
@@ -181,7 +188,8 @@ ALL_PLATFORMS = {
                        parents = ['libxcb', 'xcb-proto'],
                        cconfcmds = ['clean-waffle', 'configure-waffle'],
                        buildcmds = ['build-waffle'],
-                       instcmds = ['check-waffle', 'install-platform']),
+                       checkcmds = ['check-waffle'],
+                       instcmds = ['install-platform']),
     'llvm-2.9': Platform(name = 'llvm-2.9',
                          parents = [],
                          buildcmds = ['build-llvm'],
@@ -191,7 +199,8 @@ ALL_PLATFORMS = {
                      parents = ['proto', 'drm', 'xcb-proto', 'libxcb'],
                      cconfcmds = ['clean-mesa', 'configure-mesa'],
                      buildcmds = ['build-mesa'],
-                     instcmds = ['check-mesa', 'install-platform']),
+                     checkcmds = ['check-mesa'],
+                     instcmds = ['install-platform']),
     'mesa-32': Platform(name = 'mesa-32',
                         srcdirs = ['~/mesa'],
                         parents = ['proto', 'drm-32', 'xcb-proto', 'libxcb-32'],
@@ -203,7 +212,8 @@ ALL_PLATFORMS = {
                              parents = ['proto', 'llvm-2.9', 'drm', 'xcb-proto', 'libxcb'],
                              cconfcmds = ['clean-mesa', 'configure-mesa-with-gallium'],
                              buildcmds = ['build-mesa'],
-                             instcmds = ['check-mesa', 'install-platform']),
+                             checkcmds = ['check-mesa'],
+                             instcmds = ['install-platform']),
     'oglc-mesa': Platform(name = 'oglc-mesa',
                           parents = ['oglc-mesa', 'mesa', 'proto', 'drm', 'xcb-proto', 'libxcb'],
                           cconfcmds = ['clean-oglc', 'configure-oglc'],
@@ -329,12 +339,13 @@ def main():
             env = platform.setup_env()
         else:
             usage()
-        if cmd == 'build':
-            cmds = platform.buildcmds
-        elif cmd == 'binst':
-            cmds = platform.buildcmds + platform.instcmds
-        else:
-            cmds = platform.cconfcmds + platform.buildcmds + platform.instcmds
+        cmds = []
+        if cmd not in ('build', 'binst'):
+            cmds += platform.cconfcmds
+        cmds += platform.buildcmds
+        if cmd != 'build':
+            cmds += platform.checkcmds
+            cmds += platform.instcmds
         runcmds(cmds, env)
     elif cmd == 'cbrec':
         if nargs != 2:
