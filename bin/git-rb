@@ -56,8 +56,12 @@ while (( $# != 0 )); do
             REVIEWER='Dylan Baker <baker.dylan.c@gmail.com>'
             ;;
         *)
-            echo "Unknown reviewer: $1"
-            exit 1
+            if expr match "$1" '.*@'; then
+                REVIEWER="$1"
+            else
+                echo "Unknown reviewer: $1"
+                exit 1
+            fi
             ;;
     esac
     shift
