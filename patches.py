@@ -162,7 +162,9 @@ def make_patches_from_mail_folder(folder_name, summary_data, old_cache, new_cach
 
     print '  Creating patch files'.format(folder_name)
     for msg_info in stuff:
-        if not PATCH_REGEXP.search(msg_info.subject) or msg_info.subject.lower().startswith('re'):
+        if msg_info.subject.lower().startswith('re'):
+            continue
+        if not (PATCH_REGEXP.search(msg_info.subject) or msg_info.analysis.diffs_found):
             continue
 
         filename = '{0}-{1}.patch'.format(nice_time(msg_info.timestamp), safe_subject(msg_info.subject)[:40])
