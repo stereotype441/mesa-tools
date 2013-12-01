@@ -112,6 +112,7 @@ def usage():
     sys.stderr.write(
 """        apply <ID>    : Apply a patch (in the current dir, using -p1)
         git-am <ID>   : Apply a patch to current git branch using "git am"
+        git-am-3 <ID> : Apply a patch to current git branch using "git am -3"
         get <ID>      : Download a patch and save it locally
         projects      : List all projects
         states        : Show list of potential patch states
@@ -462,6 +463,15 @@ def main():
             sys.exit(1)
 
         action_apply(rpc, patch_id, ['git', 'am'])
+
+    elif action == 'git-am-3':
+        try:
+            patch_id = patch_id or int(args[0])
+        except:
+            sys.stderr.write("Invalid patch ID given\n")
+            sys.exit(1)
+
+        action_apply(rpc, patch_id, ['git', 'am', '-3'])
 
     elif action == 'update':
         try:
