@@ -114,6 +114,7 @@ def usage():
         git-am <ID>   : Apply a patch to current git branch using "git am"
         git-am-3 <ID> : Apply a patch to current git branch using "git am -3"
         get <ID>      : Download a patch and save it locally
+        info <ID>     : Display patchwork info about a given patch ID
         projects      : List all projects
         states        : Show list of potential patch states
         list [str]    : List patches, using the optional filters specified
@@ -128,7 +129,8 @@ def usage():
         -p <project>  : Filter by project name (see 'projects' for list)
         -w <who>      : Filter by submitter (name, e-mail substring search)
         -d <who>      : Filter by delegate (name, e-mail substring search)
-        -n <max #>    : Restrict number of results\n""")
+        -n <max #>    : Restrict number of results
+        -m <messageid>: Filter by Message-Id\n""")
     sys.stderr.write("""\nActions that take an ID argument can also be \
 invoked with:
         -h <hash>     : Lookup by patch hash\n""")
@@ -164,10 +166,10 @@ def person_ids_by_name(rpc, name):
 
 def list_patches(patches):
     """Dump a list of patches to stdout."""
-    print("%-5s %-12s %s" % ("ID", "State", "Name"))
-    print("%-5s %-12s %s" % ("--", "-----", "----"))
+    print("%-7s %-12s %s" % ("ID", "State", "Name"))
+    print("%-7s %-12s %s" % ("--", "-----", "----"))
     for patch in patches:
-        print("%-5d %-12s %s" % (patch['id'], patch['state'], patch['name']))
+        print("%-7d %-12s %s" % (patch['id'], patch['state'], patch['name']))
 
 def action_list(rpc, filter, submitter_str, delegate_str):
     filter.resolve_ids(rpc)
@@ -223,6 +225,14 @@ def action_states(rpc):
     print("%-5s %s" % ("--", "----"))
     for state in states:
         print("%-5d %s" % (state['id'], state['name']))
+
+def action_info(rpc, patch_id):
+    patch = rpc.patch_get(patch_id)
+    s = "Information for patch id %d" % (patch_id)
+    print(s)
+    print('-' * len(s))
+    for key, value in sorted(patch.iteritems()):
+        print("- %- 14s: %s" % (key, value))
 
 def action_get(rpc, patch_id):
     patch = rpc.patch_get(patch_id)
@@ -320,7 +330,7 @@ auth_actions = ['update']
 
 def main():
     try:
-        opts, args = getopt.getopt(sys.argv[2:], 's:p:w:d:n:c:h:')
+        opts, args = getopt.getopt(sys.argv[2:], 's:p:w:d:n:c:h:m:')
     except getopt.GetoptError, err:
         print str(err)
         usage()
@@ -338,6 +348,7 @@ def main():
     commit_str = ""
     state_str = ""
     hash_str = ""
+    msgid_str = ""
     url = DEFAULT_URL
 
     config = ConfigParser.ConfigParser()
@@ -363,6 +374,8 @@ def main():
             commit_str = value
         elif name == '-h':
             hash_str = value
+        elif name == '-m':
+            msgid_str = value
         elif name == '-n':
             try:
                 filt.add("max_count", int(value))
@@ -401,6 +414,9 @@ def main():
     if state_str:
         filt.add("state", state_str)
 
+    if msgid_str:
+        filt.add("msgid", msgid_str)
+
     try:
         rpc = xmlrpclib.Server(url, transport = transport)
     except:
@@ -437,14 +453,17 @@ def main():
         if len(s) > 0:
             print unicode(s).encode("utf-8")
 
-    elif action == 'get' or action == 'save':
+    elif action in ('get', 'save', 'info'):
         try:
             patch_id = patch_id or int(args[0])
         except:
             sys.stderr.write("Invalid patch ID given\n")
             sys.exit(1)
 
-        action_get(rpc, patch_id)
+        if action == 'info':
+            action_info(rpc, patch_id)
+        else:
+            action_get(rpc, patch_id)
 
     elif action == 'apply':
         try:
