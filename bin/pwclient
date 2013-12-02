@@ -81,10 +81,11 @@ class Filter:
 
 class BasicHTTPAuthTransport(xmlrpclib.SafeTransport):
 
-    def __init__(self, username = None, password = None, use_https = False):
+    def __init__(self, username = None, password = None, use_https = False, proxy = None):
         self.username = username
         self.password = password
         self.use_https = use_https
+        self.proxy = proxy
         xmlrpclib.SafeTransport.__init__(self)
 
     def authenticated(self):
@@ -92,13 +93,22 @@ class BasicHTTPAuthTransport(xmlrpclib.SafeTransport):
 
     def send_host(self, connection, host):
         xmlrpclib.Transport.send_host(self, connection, host)
+        if self.proxy is not None:
+            connection.putheader('Host', self.realhost)
         if not self.authenticated():
             return
         credentials = '%s:%s' % (self.username, self.password)
         auth = 'Basic ' + base64.encodestring(credentials).strip()
         connection.putheader('Authorization', auth)
 
+    def send_request(self, connection, handler, request_body):
+        connection.putrequest('POST', 'http://{0}{1}'.format(self.realhost, handler))
+
     def make_connection(self, host):
+        if self.proxy is not None:
+            assert not self.use_https
+            self.realhost = host
+            return httplib.HTTP(self.proxy)
         if self.use_https:
             fn = xmlrpclib.SafeTransport.make_connection
         else:
@@ -397,11 +407,16 @@ def main():
                 config.has_option('auth', 'password'):
 
             use_https = url.startswith('https')
+            if 'LD_PRELOAD' in os.environ and os.environ['LD_PRELOAD'].find('/usr/lib/libtsocks.so') != -1:
+                proxy = 'proxj.jf.intel.com:1080'
+            else:
+                proxy = None
 
             transport = BasicHTTPAuthTransport( \
                     config.get('auth', 'username'),
                     config.get('auth', 'password'),
-                    use_https)
+                    use_https,
+                    proxy)
 
         else:
             sys.stderr.write(("The %s action requires authentication, "
