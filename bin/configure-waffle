@@ -5,9 +5,11 @@ cd ~/waffle
 git tag -d configure || true
 git tag configure `git-commit-working-tree`
 cmake \
+    -G Ninja \
     -Dwaffle_has_glx=1 \
     -Dwaffle_has_x11_egl=1 \
     -Dwaffle_has_gbm=1 \
+    -Dwaffle_build_tests=1 \
     -DCMAKE_BUILD_TYPE=debug \
     -DCMAKE_INSTALL_LIBDIR=lib \
     -DCMAKE_INSTALL_PREFIX="$PLATFORM_INSTALL_DIR" \

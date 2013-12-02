@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+platform checkactive
+rm -rf "$PLATFORM_INSTALL_DIR"
+for src_dir in $PLATFORM_SRC_DIRS; do
+    cd "$src_dir"
+    git tag -d install || true
+    git tag install `git-commit-working-tree`
+    ninja install
+done
