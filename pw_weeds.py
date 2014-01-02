@@ -1,3 +1,8 @@
+# TODO: for patches that are candidates for updates:
+# - Use "git show" of "git format-patch" to generate a patch based on the commit
+# - Strip out innocuous headers
+# - Diff the mailing list patch against the true patch using "diff -u -w -I'^\(@\|index\)'"
+
 import collections
 import argparse
 import re
