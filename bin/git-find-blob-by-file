@@ -1,0 +1,26 @@
+#!/usr/bin/python3
+
+import subprocess
+import sys
+
+path, target_sha = sys.argv[1:]
+
+found = False
+candidate_commit_shas = ['HEAD']
+for s in subprocess.check_output(['git', 'log', '--format=format:%H', path]).decode('UTF-8').splitlines():
+    candidate_commit_shas.append(s + '^')
+for commit_sha in candidate_commit_shas:
+    ls_result = subprocess.check_output(['git', 'ls-tree', commit_sha, path]).decode('UTF-8').splitlines()
+    if len(ls_result) == 0:
+        # File does not exist at this commit sha
+        continue
+    assert len(ls_result) == 1
+    permissions, obj_type, file_sha, junk = ls_result[0].split(None, 3)
+    assert obj_type == 'blob'
+    if file_sha.startswith(target_sha):
+        short_commit_sha = subprocess.check_output(['git', 'rev-parse', '--short', commit_sha]).decode('UTF-8').strip()
+        print('{0} -> {1}'.format(short_commit_sha, file_sha))
+        found = True
+
+if not found:
+    print('No commit found with file {0!r} having sha {1}'.format(path, target_sha))
