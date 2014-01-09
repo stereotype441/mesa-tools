@@ -26,6 +26,6 @@ result_dir=$HOME/tmp/piglit-result
 mkdir -p "$result_dir"
 cd "$piglit_source_dir"
 sync
-time ./piglit-run.py -n "$long_name" "$@" tests/quick.tests "$result_dir"
+time ./piglit-run.py -n "$long_name" -c "$@" tests/quick.tests "$result_dir"
 cp "$result_dir/main" "$result_parent_dir/$short_name"
 echo "Results stored in $result_parent_dir/$short_name"
