@@ -14,6 +14,7 @@ PW_INFO_REGEXP = re.compile(r'\- ([a-z_]+) +: (.*)')
 parser = argparse.ArgumentParser(description='Find patchwork patches that probably should be in "Accepted" state')
 parser.add_argument('sha_range', help='Range of SHAs to examine')
 parser.add_argument('--hash', dest='use_hash', action='store_true', help='Match patches by hash')
+parser.add_argument('-p', '--project', dest='project', action='store', help='Patchwork project to access')
 args = parser.parse_args()
 
 def pwrun_list(args):
@@ -44,6 +45,10 @@ for line in subprocess.check_output(['git', 'log', '--format=format:%H:%s', args
 for sha, subject in commits:
     print('# {0}'.format(subject))
     pw_command = ['/home/pberry/bin/pwclient']
+    if args.project:
+        pwclient_extra = ['-p', args.project]
+    else:
+        pwclient_extra = []
     if args.use_hash:
         commit_body = subprocess.check_output(['git', 'show', sha])
         p = subprocess.Popen(['python2', '/home/pberry/patchwork/apps/patchwork/parser.py', '--hash'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -52,7 +57,7 @@ for sha, subject in commits:
             print('# Could not hash this patch')
             continue
         patch_hash = stdoutdata.strip()
-        pw_command.extend(['info', '-h', patch_hash.decode('utf-8')])
+        pw_command.extend(['info'] + pwclient_extra + ['-h', patch_hash.decode('utf-8')])
         patch_id = None
         state = None
         for line in pwrun_info(pw_command):
@@ -69,7 +74,7 @@ for sha, subject in commits:
             continue
         print('pwclient update -s Accepted -c {0} {1} # was: {2}'.format(sha, patch_id, state))
     else:
-        pw_command.extend(['search', subject])
+        pw_command.extend(['search'] + pwclient_extra + [subject])
         for line in pwrun_list(pw_command):
             patch_id, state, rest = line.split(None, 2)
             if not patch_id.isdigit():
