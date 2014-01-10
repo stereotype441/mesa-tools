@@ -80,8 +80,8 @@ for sha, subject in commits:
             if not patch_id.isdigit():
                 # print('# Rejecting patch {0!r} because this is not a patch ID'.format(patch_id))
                 continue
-            if state == 'Accepted':
-                print('# Rejecting patch {0} because state is accepted'.format(patch_id))
+            if state in ('Accepted', 'Superseded'):
+                print('# Rejecting patch {0} because state is {1}'.format(patch_id, state))
                 continue
             m = PW_SUBJECT_REGEXP.match(rest)
             if m is None:
