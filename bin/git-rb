@@ -55,6 +55,9 @@ while (( $# != 0 )); do
         "dylan")
             REVIEWER='Dylan Baker <baker.dylan.c@gmail.com>'
             ;;
+        "topi")
+            REVIEWER='Topi Pohjolainen <topi.pohjolainen@intel.com>'
+            ;;
         *)
             if expr match "$1" '.*@'; then
                 REVIEWER="$1"
